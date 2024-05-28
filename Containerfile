@@ -1,3 +1,5 @@
 FROM quay.io/fedora/fedora:latest
 
-ADD app /
+RUN dnf install -y jq
+
+ADD app /app

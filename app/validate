@@ -1,0 +1,58 @@
+#!/usr/bin/bash
+
+set -e
+
+curl -sL http://downloads.openshift-console.svc.cluster.local/amd64/linux/oc.tar | tar xf -
+curl -sL http://hyperconverged-cluster-cli-download.openshift-cnv.svc.cluster.local:8080/amd64/linux/virtctl.tar.gz | tar xfz -
+export PATH=$PATH:$PWD
+
+c() { echo "# $@" ; }
+n() { echo "" ; }
+x() { echo "\$ $@" ; eval "$@" ; }
+red() { echo -e "\e[0;31m$@\e[0m" ; }
+green() { echo -e "\e[0;32m$@\e[0m" ; }
+die() { red "FATAL: $@" ; exit 1 ; }
+assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "Assertion ret 0 failed: '$@'" ; } ; green "(assert?) True" ; }
+
+compute() {
+  c "Handling '$@'"
+  case "$@" in
+    live-migration)
+      {
+        set -x
+        virtctl create vm --name val --volume-datasource=src:openshift-virtualization-os-images/rhel9 | tee vm.yaml
+        oc create -f vm.yaml
+        oc wait --for=condition=Ready=true vm val
+        #virtctl migrate val
+        tee migration.yaml <<EOF
+apiVersion: kubevirt.io/v1
+kind: VirtualMachineInstanceMigration
+metadata:
+  name: val-migration
+spec:
+  vmiName: val
+status:
+EOF
+        oc apply -f migration.yaml
+        oc wait --for=jsonpath='{.status.phase}'=Succeeded vmim val-migration
+        oc delete vm val
+      }
+      ;;
+    *)
+      c "Unknown '$@', passing"
+      exit 0
+      ;;
+  esac
+}
+
+network() { exit 0 ; }
+storage() { exit 0 ; }
+notify() { exit 0 ; }
+cleanup() {
+  set -x
+  oc delete vm val || :
+}
+
+CMD=${0/\/app\//}
+
+x "$CMD $@"

@@ -9,17 +9,19 @@ spec:
         stepTemplate:
           image: quay.io/fdeutsch/virtualization-validation:latest
         steps:
-          - command: [cleanup]
+          - command: [/app/cleanup]
+            name: cleanup
     - name: notify
       taskSpec:
         stepTemplate:
           image: quay.io/fdeutsch/virtualization-validation:latest
         steps:
-          - command: [notify]
-  results:
-    - description: Passed?
-      name: pass
-      value: $(tasks.compute.results.pass)
+          - command: [/app/notify]
+            name: notify
+#  results:
+#    - description: Passed?
+#      name: pass
+#      value: $(tasks.compute.results.pass)
   tasks:
     - name: compute
       description: Validate basic compute capabilities
@@ -27,8 +29,6 @@ spec:
         stepTemplate:
           image: quay.io/fdeutsch/virtualization-validation:latest
         steps:
-          - command: [/app/compute, basics]
-            name: basic
           - command: [/app/compute, live-migration]
             name: live-migration
           - command: [/app/compute, high-availability]
@@ -45,9 +45,13 @@ spec:
           image: quay.io/fdeutsch/virtualization-validation:latest
         steps:
           - command: [/app/storage, classes]
+            name: storageclasses
           - command: [/app/storage, local]
+            name: local-storage
           - command: [/app/storage, shared]
+            name: shared-storage
           - command: [/app/storage, snapshot-and-clone]
+            name: snapshot-and-clone
       timeout: 2m0s
 
     - name: network
@@ -56,8 +60,11 @@ spec:
           image: quay.io/fdeutsch/virtualization-validation:latest
         steps:
           - command: [/app/network, basic]
+            name: basics
           - command: [/app/network, nmstate]
+            name: nmstate
           - command: [/app/network, multus]
+            name: multus
       timeout: 2m0s
 
 
