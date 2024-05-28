@@ -3,26 +3,16 @@ kind: Pipeline
 metadata:
   name: virtualization-validation
 spec:
-  finally:
-    - name: cleanup
-      taskSpec:
-        stepTemplate:
-          image: quay.io/fdeutsch/virtualization-validation:latest
-        steps:
-          - command: [/app/cleanup]
-            name: cleanup
-    - name: notify
-      taskSpec:
-        stepTemplate:
-          image: quay.io/fdeutsch/virtualization-validation:latest
-        steps:
-          - command: [/app/notify]
-            name: notify
-#  results:
-#    - description: Passed?
-#      name: pass
-#      value: $(tasks.compute.results.pass)
   tasks:
+    - name: operator
+      taskSpec:
+        stepTemplate:
+          image: quay.io/fdeutsch/virtualization-validation:latest
+        steps:
+          - command: [/app/operator, presence]
+            name: operator-presence
+        results: []
+
     - name: compute
       description: Validate basic compute capabilities
       taskSpec:
@@ -35,8 +25,10 @@ spec:
             name: high-availability
           - command: [/app/compute, high-density]
             name: high-density
+            onError: continue
           - command: [/app/compute, high-performance]
             name: high-performance
+            onError: continue
       timeout: 2m0s
 
     - name: storage
@@ -65,8 +57,29 @@ spec:
             name: nmstate
           - command: [/app/network, multus]
             name: multus
+            onError: continue
       timeout: 2m0s
 
+#  results:
+#    - description: Passed?
+#      name: pass
+#      value: $(tasks.compute.results.pass)
+
+  finally:
+    - name: cleanup
+      taskSpec:
+        stepTemplate:
+          image: quay.io/fdeutsch/virtualization-validation:latest
+        steps:
+          - command: [/app/cleanup]
+            name: cleanup
+    - name: notify
+      taskSpec:
+        stepTemplate:
+          image: quay.io/fdeutsch/virtualization-validation:latest
+        steps:
+          - command: [/app/notify]
+            name: notify
 
 #    - name: wait-for-vmi-status
 #      params:
