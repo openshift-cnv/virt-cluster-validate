@@ -1,9 +1,10 @@
 #!/usr/bin/bash
 
-set -e
+#mkdir /tmp/app
+#pushd /tmp/app
 
-curl -sL http://downloads.openshift-console.svc.cluster.local/amd64/linux/oc.tar | tar xf -
-curl -sL http://hyperconverged-cluster-cli-download.openshift-cnv.svc.cluster.local:8080/amd64/linux/virtctl.tar.gz | tar xfz -
+#curl -sL http://downloads.openshift-console.svc.cluster.local/amd64/linux/oc.tar | tar xf -
+#curl -sL http://hyperconverged-cluster-cli-download.openshift-cnv.svc.cluster.local:8080/amd64/linux/virtctl.tar.gz | tar xfz -
 export PATH=$PATH:$PWD
 
 c() { echo "# $@" ; }
@@ -14,57 +15,50 @@ green() { echo -e "\e[0;32m$@\e[0m" ; }
 die() { red "FATAL: $@" ; exit 1 ; }
 assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "Assertion ret 0 failed: '$@'" ; } ; green "(assert?) True" ; }
 
-operator() {
-  case "$@" in
-    presence)
-      oc get -n openshift-cnv hyperconverged hyperconverged
-    ;;
-  esac
+pass() { export PASS=true; }
+fail_with() { export PASS=false; export FAIL_MESSAGE="$@" ; return 1 ; }
+
+#      oc get -n openshift-cnv hyperconverged hyperconverged
+
+main() {
+  RESULTSD="$PWD/run-$(date +%F-%T).d"
+
+  mkdir $RESULTSD
+  cd tasks.d
+
+  c "Tasks: $PWD"
+  c "Results: $RESULTSD"
+  c "Starting validation ..."
+
+  ls -1 . | while read TASK;
+  do
+  {
+    source $TASK
+
+    TASK_RESULTS="${RESULTSD}/${TASK}.log"
+    TASK_CONCLUSION="${RESULTSD}/${TASK}.conclusion"
+    DISPLAYNAME=${DISPLAYNAME:-$TASK}
+    PASS=true
+
+    #{
+    #  run
+    #  cleanup
+    #} > $TASK_RESULTS 2>&1
+
+    {
+      if $PASS;
+      then
+        c "$DISPLAYNAME: $(green PASS)"
+      else
+        c "$DISPLAYNAME: $(red FAIL)"
+        echo -e "  $FAIL_MESSAGE"
+      fi
+    } > $TASK_CONCLUSION
+  } &
+  done
+  wait
+  cat ${RESULTSD}/*.conclusion
 }
 
-compute() {
-  case "$@" in
-    live-migration)
-      {
-        set -x
-        virtctl create vm --volume-datasource=src:openshift-virtualization-os-images/rhel9 | tee vm.yaml
-        oc create -f vm.yaml
-        oc wait --for=condition=Ready=true -f vm.yaml
-        #virtctl migrate val  # we nede the vmim name
-        VMNAME=$(oc get -o jsonpath='{.metadata.name}' -f vm.yaml)
-        tee migration.yaml <<EOF
-apiVersion: kubevirt.io/v1
-kind: VirtualMachineInstanceMigration
-metadata:
-  name: ${VMNAME}-migration
-spec:
-  vmiName: ${VMNAME}
-status:
-EOF
-        oc apply -f migration.yaml
-        oc wait --for=jsonpath='{.status.phase}'=Succeeded -f migration.yaml
-        oc delete -f vm.yaml
-      }
-      ;;
-    high-performance)
-      {
-        set -x
-        virtctl create vm --instancetype cx1.medium --volume-datasource=src:openshift-virtualization-os-images/rhel9 | tee vm.yaml
-        oc create -f vm.yaml
-        oc wait --for=condition=Ready=true -f vm.yaml
-        oc delete -f vm.yaml
-      }
-      ;;
-  esac
-}
 
-network() { exit 0 ; }
-storage() { exit 0 ; }
-notify() { exit 0 ; }
-cleanup() {
-  set -x
-}
-
-CMD=${0/\/app\//}
-
-c "Handling '$CMD $@'"
+main
