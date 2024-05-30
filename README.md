@@ -34,9 +34,9 @@ $ rm -rf results.d/* ; time bash virt-cluster-validate
 FAIL - High Performance VMs / Scheduling - Unable to schedule high performance VMs. Is the CPU manager enabled?
 PASS - Host network 
 PASS - Installation 
-FAIL - Live Migration / Scheduling - Unable to schedule VMs?
+PASS - Live Migration
 PASS - Secondary networks 
-FAIL - Snapshots / Restore - Failed to restore snapshots
+PASS - Snapshots
 PASS - Storage classes 
        Storage profiles / Known - INFO - Some storage classes are not covered by storage profiles
        Storage profiles / Clone - INFO - Some storage classes only support dumb cloning, leading to slow cloning and potentially slow VM launch times
