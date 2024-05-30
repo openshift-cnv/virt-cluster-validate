@@ -18,8 +18,8 @@ However, with some work, testsuites can be consumed in this tool to prvide check
 ```console
 $ cd apps
 $ rm -rf results.d/* ; time bash virt-cluster-validate 
-# Tasks: /var/home/fabiand/work/openshift/virt-cluster-validate/app/checks.d (5)
-# Results: /var/home/fabiand/work/openshift/virt-cluster-validate/app/results.d/2024-05-30-10:57:51.d
+# Tasks: .../virt-cluster-validate/app/checks.d (5)
+# Results: .../virt-cluster-validate/app/results.d/2024-05-30-10:57:51.d
 # Starting validation ...
 # Dispatching 'high-performance' ...
 # Dispatching 'live-migration' ...
@@ -42,8 +42,8 @@ sys	0m2,913s
 $
 
 $ rm -rf results.d/* ; AS_JSON=true time bash virt-cluster-validate 
-# Tasks: /var/home/fabiand/work/openshift/virt-cluster-validate/app/checks.d (5)
-# Results: /var/home/fabiand/work/openshift/virt-cluster-validate/app/results.d/2024-05-30-10:57:51.d
+# Tasks: .../virt-cluster-validate/app/checks.d (5)
+# Results: .../virt-cluster-validate/app/results.d/2024-05-30-10:57:51.d
 # Starting validation ...
 # Dispatching 'high-performance' ...
 # Dispatching 'live-migration' ...
