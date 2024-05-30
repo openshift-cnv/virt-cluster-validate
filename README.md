@@ -28,7 +28,7 @@ $ rm -rf results.d/* ; time bash virt-cluster-validate
 # Dispatching 'storageprofiles' ...
 # Waiting for jobs to complete
 # All jobs completed. Summarizing.
-FAIL - High Performance VMs / Scheduling - Unable to schedule high performance VMs
+FAIL - High Performance VMs / Scheduling - Unable to schedule high performance VMs. Is the CPU manager enabled?
 PASS - Live Migration 
 PASS - Snapshots 
 PASS - Storage classes 
