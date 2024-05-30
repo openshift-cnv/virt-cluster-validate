@@ -1,0 +1,11 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: virtualization-validation-run-
+spec:
+  pipelineRef:
+    name: virtualization-validation
+#  taskRunTemplate:
+#    serviceAccountName: pipeline
+  timeouts:
+    pipeline: 0h3m0s
