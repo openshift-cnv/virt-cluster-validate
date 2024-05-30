@@ -18,6 +18,8 @@ assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "A
 #      oc get -n openshift-cnv hyperconverged hyperconverged
 
 run_check() {
+  CHECK=$1
+
   source checks.d/$CHECK
 
   local RESULTSD="${RUN_RESULTSD}/${CHECK}"
@@ -25,14 +27,15 @@ run_check() {
   local LOG_FILE="${RESULTSD}/log.txt"
   local RESULT_FILE_JSON="${RESULTSD}/result.json"
   local DISPLAYNAME=${DISPLAYNAME:-$CHECK}
-  export PASS=true LVL= MESSAGE=
+  export PASS=true LVL= MESSAGE= SUBCHECK=
 
-  mkdir -p $RESULTSD
+  mkdir -p $RESULTSD $WD
 
   _write_result_json() {
     cat >> $RESULT_FILE_JSON <<EOJ
 {
   "check": "$CHECK",
+  "subcheck": "$SUBCHECK",
   "displayname": "$DISPLAYNAME",
   "pass": $PASS,
   "level": "$LVL",
@@ -40,20 +43,26 @@ run_check() {
 }
 EOJ
   }
-  pass() { export PASS=true MESSAGE="$@" ; _write_result_json ; }
-  pass_with_warn() { export PASS=true LVL=WARN ; export MESSAGE="$@" ; _write_result_json ; }
-  fail_with() { export PASS=false LVL=FAIL ; export MESSAGE="$@" ; _write_result_json ; exit 1 ; }
+  pass() { SUBCHECK= PASS=true MESSAGE="$@" ; _write_result_json ; }
+  pass_with_warn() { SUBCHECK=$1 ; shift ; PASS=true LVL=WARN ; export MESSAGE="$@" ; _write_result_json ; }
+  pass_with_info() { SUBCHECK=$1 ; shift ; PASS=true LVL=INFO ; export MESSAGE="$@" ; _write_result_json ; }
+  fail_with() { SUBCHECK=$1 ; shift ; PASS=false LVL=FAIL MESSAGE="$@" ; _write_result_json ; exit 1 ; }
 
   (
+    set -x
     pushd $WD
     run
-    cleanup
-    popd
+    pass
   ) > $LOG_FILE 2>&1
+  (
+    set -x
+    pushd $WD
+    cleanup
+  ) >> $LOG_FILE 2>&1
 }
 
 main() {
-  export RUN_CHECKSD="$PWD/checks.d"
+  export RUN_CHECKSD="${1:-$PWD/checks.d}"
   export RUN_RESULTSD="$PWD/results.d/$(date +%F-%T).d"
 
   mkdir $RUN_RESULTSD
@@ -65,7 +74,7 @@ main() {
   set -m  # job control
   for REL_CHECK in $(ls -1 $RUN_CHECKSD);
   do
-    c "Checking '$DISPLAYNAME' async ..."
+    c "Dispatching '$REL_CHECK' ..."
     run_check $(basename $REL_CHECK) &
   done
 
@@ -75,7 +84,12 @@ main() {
 
   cat ${RUN_RESULTSD}/*/result.json \
   | jq -s . \
-  | jq '{apiVersion: "validate.kubevirt.io/v1alpha1", kind: "Results", items: .}'
+  | jq '{apiVersion: "validate.kubevirt.io/v1alpha1", kind: "Results", items: .}' \
+  | pprint
 }
 
-main
+pprint() {
+  jq -r '.items[] | if .pass == false or .subcheck == "" then [if .pass == true then "PASS" else "FAIL" end, "-", .displayname, if .subcheck != "" then ["/", .subcheck, "-", .message] | join(" ") else "" end] else ["      ", .displayname, "/", .subcheck, "-", .level, "-", .message ] end | join(" ")';
+}
+
+main $1

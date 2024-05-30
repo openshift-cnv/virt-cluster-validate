@@ -5,7 +5,9 @@ DISPLAYNAME="High Performance VMs"
 run() {
   virtctl create vm --instancetype cx1.medium --volume-datasource=src:openshift-virtualization-os-images/rhel9 | tee vm.yaml
   oc create -f vm.yaml
-  oc wait --for=condition=Ready=true -f vm.yaml || pass_with_warn "Unable to schedule high performance VMs"
+
+  oc wait --for=condition=Ready=true -f vm.yaml \
+  || fail_with Scheduling "Unable to schedule high performance VMs"
 }
 
 cleanup() {
