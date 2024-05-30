@@ -1,0 +1,81 @@
+#!/usr/bin/bash
+
+#mkdir /tmp/app
+#pushd /tmp/app
+
+#curl -sL http://downloads.openshift-console.svc.cluster.local/amd64/linux/oc.tar | tar xf -
+#curl -sL http://hyperconverged-cluster-cli-download.openshift-cnv.svc.cluster.local:8080/amd64/linux/virtctl.tar.gz | tar xfz -
+export PATH=$PATH:$PWD
+
+c() { echo "# $@" ; }
+n() { echo "" ; }
+x() { echo "\$ $@" ; eval "$@" ; }
+red() { echo -e "\e[0;31m$@\e[0m" ; }
+green() { echo -e "\e[0;32m$@\e[0m" ; }
+die() { red "FATAL: $@" ; exit 1 ; }
+assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "Assertion ret 0 failed: '$@'" ; } ; green "(assert?) True" ; }
+
+#      oc get -n openshift-cnv hyperconverged hyperconverged
+
+run_check() {
+  source checks.d/$CHECK
+
+  local RESULTSD="${RUN_RESULTSD}/${CHECK}"
+  local WD="${RESULTSD}/wd"
+  local LOG_FILE="${RESULTSD}/log.txt"
+  local RESULT_FILE_JSON="${RESULTSD}/result.json"
+  local DISPLAYNAME=${DISPLAYNAME:-$CHECK}
+  export PASS=true LVL= MESSAGE=
+
+  mkdir -p $RESULTSD
+
+  _write_result_json() {
+    cat >> $RESULT_FILE_JSON <<EOJ
+{
+  "check": "$CHECK",
+  "displayname": "$DISPLAYNAME",
+  "pass": $PASS,
+  "level": "$LVL",
+  "message": "$MESSAGE"
+}
+EOJ
+  }
+  pass() { export PASS=true MESSAGE="$@" ; _write_result_json ; }
+  pass_with_warn() { export PASS=true LVL=WARN ; export MESSAGE="$@" ; _write_result_json ; }
+  fail_with() { export PASS=false LVL=FAIL ; export MESSAGE="$@" ; _write_result_json ; exit 1 ; }
+
+  (
+    pushd $WD
+    run
+    cleanup
+    popd
+  ) > $LOG_FILE 2>&1
+}
+
+main() {
+  export RUN_CHECKSD="$PWD/checks.d"
+  export RUN_RESULTSD="$PWD/results.d/$(date +%F-%T).d"
+
+  mkdir $RUN_RESULTSD
+
+  c "Tasks: $RUN_CHECKSD ($(ls -1 $RUN_CHECKSD | wc -l))"
+  c "Results: $RUN_RESULTSD"
+  c "Starting validation ..."
+
+  set -m  # job control
+  for REL_CHECK in $(ls -1 $RUN_CHECKSD);
+  do
+    c "Checking '$DISPLAYNAME' async ..."
+    run_check $(basename $REL_CHECK) &
+  done
+
+  c "Waiting for jobs to complete" 
+  wait -f
+  c "All jobs completed. Summarizing."
+
+  cat ${RUN_RESULTSD}/*/result.json \
+  | jq -s . \
+  | jq '{apiVersion: "validate.kubevirt.io/v1alpha1", kind: "Results", items: .}'
+}
+
+main
