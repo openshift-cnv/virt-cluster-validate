@@ -89,7 +89,12 @@ main() {
 }
 
 pprint() {
-  jq -r '.items[] | if .pass == false or .subcheck == "" then [if .pass == true then "PASS" else "FAIL" end, "-", .displayname, if .subcheck != "" then ["/", .subcheck, "-", .message] | join(" ") else "" end] else ["      ", .displayname, "/", .subcheck, "-", .level, "-", .message ] end | join(" ")';
+  if [[ -n "$AS_JSON" ]];
+  then
+    jq
+  else
+    jq -r '.items[] | if .pass == false or .subcheck == "" then [if .pass == true then "PASS" else "FAIL" end, "-", .displayname, if .subcheck != "" then ["/", .subcheck, "-", .message] | join(" ") else "" end] else ["      ", .displayname, "/", .subcheck, "-", .level, "-", .message ] end | join(" ")';
+  fi
 }
 
 main $1
