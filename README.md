@@ -18,35 +18,44 @@ However, with some work, testsuites can be consumed in this tool to prvide check
 ```console
 $ cd apps
 $ rm -rf results.d/* ; time bash virt-cluster-validate 
-# Tasks: .../virt-cluster-validate/app/checks.d (5)
-# Results: .../virt-cluster-validate/app/results.d/2024-05-30-10:57:51.d
+# Tasks: /var/home/fabiand/work/openshift/virt-cluster-validate/app/checks.d (8)
+# Results: /var/home/fabiand/work/openshift/virt-cluster-validate/app/results.d/2024-05-30-11:15:23.d
 # Starting validation ...
 # Dispatching 'high-performance' ...
+# Dispatching 'host-network' ...
+# Dispatching 'installation' ...
 # Dispatching 'live-migration' ...
+# Dispatching 'network' ...
 # Dispatching 'snapshots' ...
 # Dispatching 'storageclasses' ...
 # Dispatching 'storageprofiles' ...
 # Waiting for jobs to complete
 # All jobs completed. Summarizing.
 FAIL - High Performance VMs / Scheduling - Unable to schedule high performance VMs. Is the CPU manager enabled?
-PASS - Live Migration 
-PASS - Snapshots 
+PASS - Host network 
+PASS - Installation 
+FAIL - Live Migration / Scheduling - Unable to schedule VMs?
+PASS - Secondary networks 
+FAIL - Snapshots / Restore - Failed to restore snapshots
 PASS - Storage classes 
        Storage profiles / Known - INFO - Some storage classes are not covered by storage profiles
        Storage profiles / Clone - INFO - Some storage classes only support dumb cloning, leading to slow cloning and potentially slow VM launch times
 PASS - Storage profiles 
 
-real	0m48,542s
-user	0m13,765s
-sys	0m2,913s
+real	1m0,643s
+user	0m12,735s
+sys	0m2,570s
 $
 
 $ rm -rf results.d/* ; AS_JSON=true time bash virt-cluster-validate 
-# Tasks: .../virt-cluster-validate/app/checks.d (5)
-# Results: .../virt-cluster-validate/app/results.d/2024-05-30-10:57:51.d
+# Tasks: /var/home/fabiand/work/openshift/virt-cluster-validate/app/checks.d (8)
+# Results: /var/home/fabiand/work/openshift/virt-cluster-validate/app/results.d/2024-05-30-11:17:00.d
 # Starting validation ...
 # Dispatching 'high-performance' ...
+# Dispatching 'host-network' ...
+# Dispatching 'installation' ...
 # Dispatching 'live-migration' ...
+# Dispatching 'network' ...
 # Dispatching 'snapshots' ...
 # Dispatching 'storageclasses' ...
 # Dispatching 'storageprofiles' ...
@@ -62,12 +71,36 @@ $ rm -rf results.d/* ; AS_JSON=true time bash virt-cluster-validate
       "displayname": "High Performance VMs",
       "pass": false,
       "level": "FAIL",
-      "message": "Unable to schedule high performance VMs"
+      "message": "Unable to schedule high performance VMs. Is the CPU manager enabled?"
+    },
+    {
+      "check": "host-network",
+      "subcheck": "",
+      "displayname": "Host network",
+      "pass": true,
+      "level": "",
+      "message": ""
+    },
+    {
+      "check": "installation",
+      "subcheck": "",
+      "displayname": "Installation",
+      "pass": true,
+      "level": "",
+      "message": ""
     },
     {
       "check": "live-migration",
       "subcheck": "",
       "displayname": "Live Migration",
+      "pass": true,
+      "level": "",
+      "message": ""
+    },
+    {
+      "check": "network",
+      "subcheck": "",
+      "displayname": "Secondary networks",
       "pass": true,
       "level": "",
       "message": ""
