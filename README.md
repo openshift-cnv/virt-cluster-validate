@@ -2,7 +2,16 @@
 
 * Fast, timeboxed 3min
 * User understandable
-* Actionable
+* Easy to extend
+* For arbitrary user clusters
+
+## Why not tier1/2?
+
+They are great candidates!
+However, testsuites often have expectations on the environment, thus are not easy to run in arbitrary clusters.
+Testsuites also usually have a long run time.
+
+However, with some work, testsuites can be consumed in this tool to prvide checks if they meet the tools requirements.
 
 ## Example
 
