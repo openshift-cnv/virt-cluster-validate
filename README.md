@@ -52,19 +52,6 @@ $ rm -rf results.d/* ; AS_JSON=true time bash virt-cluster-validate
 # Dispatching 'storageprofiles' ...
 # Waiting for jobs to complete
 # All jobs completed. Summarizing.
-FAIL - High Performance VMs / Scheduling - Unable to schedule high performance VMs
-PASS - Live Migration 
-PASS - Snapshots 
-PASS - Storage classes 
-       Storage profiles / Known - INFO - Some storage classes are not covered by storage profiles
-       Storage profiles / Clone - INFO - Some storage classes only support dumb cloning, leading to slow cloning and potentially slow VM launch times
-PASS - Storage profiles 
-
-real	0m48,542s
-user	0m13,765s
-sys	0m2,913s
-$
-
 {
   "apiVersion": "validate.kubevirt.io/v1alpha1",
   "kind": "Results",
