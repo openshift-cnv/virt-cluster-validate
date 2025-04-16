@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+source lib.sh
+
 export DISPLAYNAME="Secondary networks"
 
 run() {
@@ -10,3 +12,5 @@ run() {
 cleanup() {
   :
 }
+
+${@:-main}

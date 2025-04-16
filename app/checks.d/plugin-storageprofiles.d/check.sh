@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+source lib.sh
+
 export DISPLAYNAME="Storage profiles"
 
 run() {
@@ -30,3 +32,5 @@ run() {
 cleanup() {
   :
 }
+
+${@:-main}

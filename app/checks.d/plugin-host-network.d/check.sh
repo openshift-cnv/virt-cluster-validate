@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+source lib.sh
+
 export DISPLAYNAME="Host network"
 
 run() {
@@ -10,3 +12,5 @@ run() {
 cleanup() {
   :
 }
+
+${@:-main}

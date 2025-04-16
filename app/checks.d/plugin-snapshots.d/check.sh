@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+source lib.sh
+
 export DISPLAYNAME="Snapshots"
 
 run() {
@@ -51,3 +53,5 @@ cleanup() {
   oc delete -f snap.yaml
   oc delete -f restore.yaml
 }
+
+${@:-main}

@@ -20,22 +20,23 @@ assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "A
 run_check() {
   CHECK=$1
 
-  source checks.d/$CHECK
 
   local RESULTSD="${RUN_RESULTSD}/${CHECK}"
   local WD="${RESULTSD}/wd"
   local LOG_FILE="${RESULTSD}/log.txt"
-  local RESULT_FILE_JSON="${RESULTSD}/result.json"
+  local RESULT_RAW_FILE_JSON="${RESULTSD}/result_raw.json"
   local DISPLAYNAME=${DISPLAYNAME:-$CHECK}
-  export PASS=true LVL= MESSAGE= SUBCHECK=
+  export PASS=true LVL= MESSAGE= STEP=
 
   mkdir -p $RESULTSD $WD
 
+  source checks.d/$CHECK
+
   _write_result_json() {
-    cat >> $RESULT_FILE_JSON <<EOJ
+    cat >> $RESULT_RAW_FILE_JSON <<EOJ
 {
   "check": "$CHECK",
-  "subcheck": "$SUBCHECK",
+  "step": "$STEP",
   "displayname": "$DISPLAYNAME",
   "pass": $PASS,
   "level": "$LVL",
@@ -43,10 +44,10 @@ run_check() {
 }
 EOJ
   }
-  pass() { SUBCHECK= PASS=true MESSAGE="$@" ; _write_result_json ; }
-  pass_with_warn() { SUBCHECK=$1 ; shift ; PASS=true LVL=WARN ; export MESSAGE="$@" ; _write_result_json ; }
-  pass_with_info() { SUBCHECK=$1 ; shift ; PASS=true LVL=INFO ; export MESSAGE="$@" ; _write_result_json ; }
-  fail_with() { SUBCHECK=$1 ; shift ; PASS=false LVL=FAIL MESSAGE="$@" ; _write_result_json ; exit 1 ; }
+  pass() { STEP= PASS=true MESSAGE="$@" ; _write_result_json ; }
+  pass_with_warn() { STEP=$1 ; shift ; PASS=true LVL=WARN ; export MESSAGE="$@" ; _write_result_json ; }
+  pass_with_info() { STEP=$1 ; shift ; PASS=true LVL=INFO ; export MESSAGE="$@" ; _write_result_json ; }
+  fail_with() { STEP=$1 ; shift ; PASS=false LVL=FAIL MESSAGE="$@" ; _write_result_json ; exit 1 ; }
 
   (
     set -x
@@ -82,9 +83,10 @@ main() {
   wait -f
   c "All jobs completed. Summarizing."
 
-  cat ${RUN_RESULTSD}/*/result.json \
+  cat ${RUN_RESULTSD}/*/result_raw.json \
   | jq -s . \
   | jq '{apiVersion: "validate.kubevirt.io/v1alpha1", kind: "Results", items: .}' \
+  | tee ${RUN_RESULTSD}/result.json \
   | pprint
 }
 
@@ -93,7 +95,7 @@ pprint() {
   then
     jq
   else
-    jq -r '.items[] | if .pass == false or .subcheck == "" then [if .pass == true then "PASS" else "FAIL" end, "-", .displayname, if .subcheck != "" then ["/", .subcheck, "-", .message] | join(" ") else "" end] else ["      ", .displayname, "/", .subcheck, "-", .level, "-", .message ] end | join(" ")';
+    jq -r '.items[] | if .pass == false or .step == "" then [if .pass == true then "PASS" else "FAIL" end, "-", .displayname, if .step != "" then ["/", .step, "-", .message] | join(" ") else "" end] else ["      ", .displayname, "/", .step, "-", .level, "-", .message ] end | join(" ")';
   fi
 }
 

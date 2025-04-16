@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+source lib.sh
+
 DISPLAYNAME="High Performance VMs"
 
 run() {
@@ -13,3 +15,5 @@ run() {
 cleanup() {
   oc delete -f vm.yaml
 }
+
+${@:-main}

@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+source lib.sh
+
 export DISPLAYNAME="Storage classes"
 
 run() {
@@ -13,3 +15,5 @@ run() {
 cleanup() {
   :
 }
+
+${@:-main}

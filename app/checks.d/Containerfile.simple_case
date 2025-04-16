@@ -1,0 +1,4 @@
+FROM ${CONTAINERIMAGE_BASE:-quay.io/fedora/fedora:latest}
+
+ADD lib.sh check.sh /
+ENTRYPOINT ["/check.sh"]
