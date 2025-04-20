@@ -5,7 +5,7 @@ source lib.sh
 export DISPLAYNAME="Storage profiles"
 
 run() {
-  oc get storageprofiles -o json > storageprofiles.json
+  oc get storageprofiles -o json > storageprofiles.json || fail_with Basic "No storageclasses found."
 
   # No claimPropertySets, impact: User has ot specify acces and vol mode
   cat storageprofiles.json \
@@ -24,7 +24,6 @@ run() {
   cat storageprofiles.json \
   | jq -e '[ .items[] | .status.claimPropertySets[]?.volumeMode ] | unique | flatten | index ("Block")' \
   || pass_with_info ReadWriteMany "There is now storageclass supporting Block mode, this can lead to lower performance."
-
 
   #jq '[ .items[] | select(.status | has("cloneStrategy") | not) | .metadata.name] | length'
 }

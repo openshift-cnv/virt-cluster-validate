@@ -17,86 +17,71 @@ assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "A
 
 #      oc get -n openshift-cnv hyperconverged hyperconverged
 
-run_check() {
-  CHECK=$1
-
-
-  local RESULTSD="${RUN_RESULTSD}/${CHECK}"
-  local WD="${RESULTSD}/wd"
-  local LOG_FILE="${RESULTSD}/log.txt"
-  local RESULT_RAW_FILE_JSON="${RESULTSD}/result_raw.json"
-  local DISPLAYNAME=${DISPLAYNAME:-$CHECK}
-  export PASS=true LVL= MESSAGE= STEP=
-
-  mkdir -p $RESULTSD $WD
-
-  source checks.d/$CHECK
-
-  _write_result_json() {
-    cat >> $RESULT_RAW_FILE_JSON <<EOJ
-{
-  "check": "$CHECK",
-  "step": "$STEP",
-  "displayname": "$DISPLAYNAME",
-  "pass": $PASS,
-  "level": "$LVL",
-  "message": "$MESSAGE"
-}
-EOJ
-  }
-  pass() { STEP= PASS=true MESSAGE="$@" ; _write_result_json ; }
-  pass_with_warn() { STEP=$1 ; shift ; PASS=true LVL=WARN ; export MESSAGE="$@" ; _write_result_json ; }
-  pass_with_info() { STEP=$1 ; shift ; PASS=true LVL=INFO ; export MESSAGE="$@" ; _write_result_json ; }
-  fail_with() { STEP=$1 ; shift ; PASS=false LVL=FAIL MESSAGE="$@" ; _write_result_json ; exit 1 ; }
-
-  (
-    set -x
-    pushd $WD
-    run
-    pass
-  ) > $LOG_FILE 2>&1
-  (
-    set -x
-    pushd $WD
-    cleanup
-  ) >> $LOG_FILE 2>&1
-}
-
 main() {
-  export RUN_CHECKSD="${1:-$PWD/checks.d}"
-  export RUN_RESULTSD="$PWD/results.d/$(date +%F-%T).d"
+  local PLUGIN_FILTER="${1:-*}"
 
-  mkdir $RUN_RESULTSD
+  local PLUGINS=$(cat checks.d/generated-plugin-index.txt | grep -E "$PLUGIN_FILTER" | sort)
+  local RESULTSD=$PWD/results.d/
 
-  c "Tasks: $RUN_CHECKSD ($(ls -1 $RUN_CHECKSD | wc -l))"
-  c "Results: $RUN_RESULTSD"
   c "Starting validation ..."
 
   set -m  # job control
-  for REL_CHECK in $(ls -1 $RUN_CHECKSD);
+  for PLUGIN in $PLUGINS
   do
-    c "Dispatching '$REL_CHECK' ..."
-    run_check $(basename $REL_CHECK) &
+    PLUGIN_RESULTS="$RESULTSD/$(echo $PLUGIN | tr "/:.-" "____").d/"
+    mkdir -p $PLUGIN_RESULTS
+    c "Dispatching '$PLUGIN' ..."
+    (
+    set -x
+    podman -r run \
+        --rm \
+        --volume $PLUGIN_RESULTS:/results.d:rw,z \
+        --volume $HOME/.kube:/.kube:ro,z \
+        --volume $(which oc):/usr/bin/oc:ro,bind,exec,z \
+        --volume $(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \
+        $PLUGIN
+    ) > $PLUGIN_RESULTS/cmdline 2>&1 &
   done
 
   c "Waiting for jobs to complete" 
   wait -f
   c "All jobs completed. Summarizing."
 
-  cat ${RUN_RESULTSD}/*/result_raw.json \
+  cat ${RESULTSD}/*/result.json \
   | jq -s . \
   | jq '{apiVersion: "validate.kubevirt.io/v1alpha1", kind: "Results", items: .}' \
-  | tee ${RUN_RESULTSD}/result.json \
+  | tee ${RESULTSD}/result.json \
   | pprint
 }
 
+highlight() {
+	declare -A fg_color_map
+	fg_color_map[black]=30
+	fg_color_map[red]=31
+	fg_color_map[green]=32
+	fg_color_map[yellow]=33
+	fg_color_map[blue]=34
+	fg_color_map[magenta]=35
+	fg_color_map[cyan]=36
+	 
+	fg_c=$(echo -e "\e[1;${fg_color_map[$1]}m")
+	c_rs=$'\e[0m'
+	sed -u s"/$2/$fg_c\0$c_rs/g"
+}
+
 pprint() {
+  (
   if [[ -n "$AS_JSON" ]];
   then
     jq
   else
-    jq -r '.items[] | if .pass == false or .step == "" then [if .pass == true then "PASS" else "FAIL" end, "-", .displayname, if .step != "" then ["/", .step, "-", .message] | join(" ") else "" end] else ["      ", .displayname, "/", .step, "-", .level, "-", .message ] end | join(" ")';
+    jq -r '.items[]
+           | if .pass == false or .step == "" 
+             then [if .pass == true then "PASS" else "FAIL" end, "-", .displayname, if .step != "" then ["/", .step, "-", .message] | join(" ") else "" end] 
+             else ["      ", .displayname, "/", .step, "-", .level, "-", .message ] end
+           | join(" ")';
   fi
+  ) | highlight red FAIL | highlight yellow WARN | highlight cyan INFO | highlight green PASS
 }
 
-main $1
+main $@

@@ -5,7 +5,7 @@ source lib.sh
 export DISPLAYNAME="Snapshots"
 
 run() {
-  virtctl create vm --volume-datasource=src:openshift-virtualization-os-images/rhel9 | tee vm.yaml
+  virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/fedora | tee vm.yaml
   oc create -f vm.yaml
 
 #  oc wait --for=condition=Ready=true -f vm.yaml \

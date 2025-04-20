@@ -1,4 +1,6 @@
 FROM ${CONTAINERIMAGE_BASE:-quay.io/fedora/fedora:latest}
 
+ENV HOME /
+RUN mkdir /results.d
 ADD lib.sh check.sh /
 ENTRYPOINT ["/check.sh"]
