@@ -60,10 +60,6 @@ main() {
     pushd $WD
     run
     pass
-  ) > $LOG_FILE 2>&1
-  (
-    set -x
-    pushd $WD
     cleanup
   ) >> $LOG_FILE 2>&1
 }

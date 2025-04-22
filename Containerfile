@@ -1,5 +1,7 @@
 FROM quay.io/fedora/fedora:latest
 
-RUN dnf install -y jq
+RUN dnf install -y jq podman
 
-ADD app /app
+ADD . /
+
+ENTRYPOINT ["/entrypoint.sh"]

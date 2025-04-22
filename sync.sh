@@ -1,5 +1,4 @@
 set -xe
-bash -n app/*
 podman -r build -t quay.io/fdeutsch/virtualization-validation . \
 && podman -r push quay.io/fdeutsch/virtualization-validation \
 && podman -r run quay.io/fdeutsch/virtualization-validation

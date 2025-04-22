@@ -1,0 +1,55 @@
+#!/usr/bin/bash
+
+cat <<EOY
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  annotations:
+  name: virt-cluster-validate
+spec:
+#  finally:
+#    - name: cleanup
+#      taskSpec:
+#        metadata: {}
+#        spec: null
+#        stepTemplate:
+#          computeResources: {}
+#          image: 'quay.io/fdeutsch/virtualization-validation:latest'
+#        steps:
+#          - command:
+#              - /app/cleanup
+#            computeResources: {}
+#            name: cleanup
+  tasks:
+EOY
+
+
+PLUGINS=$(cat checks.d/generated-plugin-index.txt | grep -E "$PLUGIN_FILTER" | sort)
+for PLUGIN in $PLUGINS
+do
+cat <<EOY
+    - displayName: "$PLUGIN"
+      name: plugin
+      taskSpec:
+        metadata: {}
+        results:
+          - name: stdout
+            type: string
+        spec: null
+        stepTemplate:
+          computeResources: {}
+          env:
+            - name: RESULT_STDOUT
+              value: \$(results.stdout.path)
+          image: '$PLUGIN'
+        steps:
+          - command:
+              - /check.sh
+              - main
+            computeResources: {}
+            name: check
+      timeout: 2m0s
+EOY
+done
+#            onError: continue
+

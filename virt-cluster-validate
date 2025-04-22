@@ -17,13 +17,43 @@ assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "A
 
 #      oc get -n openshift-cnv hyperconverged hyperconverged
 
-main() {
-  local PLUGIN_FILTER="${1:-*}"
+BUILT_PLUGINS_INDEX="checks.d/generated-plugin-index.txt"
 
+main() {
+  c "Starting validation ..."
+  if [[ -f "$BUILT_PLUGINS_INDEX" ]];
+  then
+      main_with_containers
+  else
+    set -m  # job control
+    PLUGIN_FILTER="${1:-*}"
+    PLUGINS=$(ls -1d checks.d | grep -E "$PLUGIN_FILTER" | sort)
+    for PLUGIN in $PLUGINS
+    do
+      PLUGIN_RESULTS="$RESULTSD/$(echo $PLUGIN | tr "/:.-" "____").d/"
+      mkdir -p $PLUGIN_RESULTS
+      (
+          $PLUGIN
+      ) > $PLUGIN_RESULTS/cmdline 2>&1 &
+    done
+
+    c "Waiting for jobs to complete" 
+    wait -f
+  fi
+
+  c "All jobs completed. Summarizing."
+  cat ${RESULTSD}/*/result.json \
+  | jq -s . \
+  | jq '{apiVersion: "validate.kubevirt.io/v1alpha1", kind: "Results", items: .}' \
+  | tee ${RESULTSD}/result.json \
+  | pprint
+
+}
+
+main_with_containers() {
+  local PLUGIN_FILTER="${1:-*}"
   local PLUGINS=$(cat checks.d/generated-plugin-index.txt | grep -E "$PLUGIN_FILTER" | sort)
   local RESULTSD=$PWD/results.d/
-
-  c "Starting validation ..."
 
   set -m  # job control
   for PLUGIN in $PLUGINS
@@ -47,11 +77,6 @@ main() {
   wait -f
   c "All jobs completed. Summarizing."
 
-  cat ${RESULTSD}/*/result.json \
-  | jq -s . \
-  | jq '{apiVersion: "validate.kubevirt.io/v1alpha1", kind: "Results", items: .}' \
-  | tee ${RESULTSD}/result.json \
-  | pprint
 }
 
 highlight() {
@@ -70,18 +95,16 @@ highlight() {
 }
 
 pprint() {
-  (
-  if [[ -n "$AS_JSON" ]];
-  then
+#  if [[ -n "$AS_JSON" ]];
+#  then
     jq
-  else
+#  else
     jq -r '.items[]
            | if .pass == false or .step == "" 
              then [if .pass == true then "PASS" else "FAIL" end, "-", .displayname, if .step != "" then ["/", .step, "-", .message] | join(" ") else "" end] 
              else ["      ", .displayname, "/", .step, "-", .level, "-", .message ] end
-           | join(" ")';
-  fi
-  ) | highlight red FAIL | highlight yellow WARN | highlight cyan INFO | highlight green PASS
+           | join(" ")' | highlight red FAIL | highlight yellow WARN | highlight cyan INFO | highlight green PASS;
+#  fi
 }
 
 main $@
