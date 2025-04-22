@@ -2,7 +2,7 @@
 
 source ../lib.sh
 
-export DISPLAYNAME="Storage classes"
+export CHECK_DISPLAYNAME="Storage classes"
 
 run() {
   oc get storageclasses -o json > storageclasses.json

@@ -2,7 +2,7 @@
 
 source ../lib.sh
 
-export DISPLAYNAME="Secondary networks"
+export CHECK_DISPLAYNAME="Secondary networks"
 
 run() {
   oc get projects | grep openshift-multus \

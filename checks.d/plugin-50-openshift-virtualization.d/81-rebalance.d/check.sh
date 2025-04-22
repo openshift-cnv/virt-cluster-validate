@@ -2,7 +2,7 @@
 
 source ../lib.sh
 
-export DISPLAYNAME="Rebalancing"
+export CHECK_DISPLAYNAME="Rebalancing"
 
 run() {
     echo TBD FIXME

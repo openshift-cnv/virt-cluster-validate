@@ -2,7 +2,7 @@
 
 source ../lib.sh
 
-export DISPLAYNAME="Host network"
+export CHECK_DISPLAYNAME="Host network"
 
 run() {
   oc get crd nodenetworkconfigurationpolicies.nmstate.io \

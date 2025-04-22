@@ -2,7 +2,7 @@
 
 source ../lib.sh
 
-export DISPLAYNAME="Live Migration"
+export CHECK_DISPLAYNAME="Live Migration"
 
 run() {
   virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/fedora | tee vm.yaml

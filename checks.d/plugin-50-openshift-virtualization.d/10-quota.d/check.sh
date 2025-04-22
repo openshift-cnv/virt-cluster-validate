@@ -2,7 +2,7 @@
 
 source ../lib.sh
 
-export DISPLAYNAME="Quota"
+export CHECK_DISPLAYNAME="Quota"
 
 run() {
   oc get quota | wc -l | test $(cat /dev/stdin) -eq 1 \

@@ -2,7 +2,8 @@
 
 source ../lib.sh
 
-export DISPLAYNAME="Installation"
+export CHECK_NAME="$BASH_SOURCE"
+export CHECK_DISPLAYNAME="Installation"
 
 run() {
   oc get projects | grep openshift-cnv \

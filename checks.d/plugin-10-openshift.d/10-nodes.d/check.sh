@@ -2,7 +2,7 @@
 
 source ../lib.sh
 
-export DISPLAYNAME="Nodes"
+export CHECK_DISPLAYNAME="Nodes"
 
 run() {
   WORKER_NODE_COUNT=$(oc get nodes -o names -l node-role.kubernetes.io/worker | wc -l )

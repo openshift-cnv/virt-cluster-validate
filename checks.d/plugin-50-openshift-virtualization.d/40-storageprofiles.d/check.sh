@@ -2,7 +2,7 @@
 
 source ../lib.sh
 
-export DISPLAYNAME="Storage profiles"
+export CHECK_DISPLAYNAME="Storage profiles"
 
 run() {
   oc get storageprofiles -o json > storageprofiles.json || fail_with Basic "No storageclasses found."

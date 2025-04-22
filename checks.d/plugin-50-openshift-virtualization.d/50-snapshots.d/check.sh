@@ -2,7 +2,7 @@
 
 source ../lib.sh
 
-export DISPLAYNAME="Snapshots"
+export CHECK_DISPLAYNAME="Snapshots"
 
 run() {
   virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/fedora | tee vm.yaml
