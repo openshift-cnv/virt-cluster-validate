@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-source lib.sh
+source ../lib.sh
 
 DISPLAYNAME="High Performance VMs"
 
