@@ -84,11 +84,19 @@ pprint() {
 #    jq
 #  else
     jq -r '
-    .items[]
-           | if .pass == false or .step == "" 
-             then [if .pass == true then "PASS" else "FAIL" end, "-", .displayname, if .step != "" then ["/", .step, "-", .message] | join(" ") else "" end] 
-             else ["      ", .displayname, "/", .step, "-", .level, "-", .message ] end
-           | join(" ")'
+.items[]
+| [
+   if .step.pass then "PASS" else "FAIL" end,
+   "-",
+   .step.level,
+   "-",
+   .check.displayname,
+   "/",
+   .step.name,
+   "-",
+   .step.message ]
+| join(" ")
+'
 #  fi
 }
 
