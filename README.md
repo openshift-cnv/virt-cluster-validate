@@ -89,7 +89,7 @@ A JSON report is available at `results.d/result.json`:
 ```console
 $ cat results.d/result.json 
 {
-  "apiVersion": "validate.kubevirt.io/v1alpha1",
+  "apiVersion": "validate.kubevirt.openshift.com/v1alpha1",
   "kind": "Results",
   "items": [
     {

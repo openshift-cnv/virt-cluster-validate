@@ -23,7 +23,7 @@ main() {
   c "Summarizing results from '$RESULTSD'"
   cat ${RESULTSD}/*/result.json \
   | jq -s . \
-  | jq '{apiVersion: "validate.kubevirt.io/v1alpha1", kind: "Results", items: .}' \
+  | jq '{apiVersion: "validate.kubevirt.openshift.com/v1alpha1", kind: "Results", items: .}' \
   | tee ${RESULTSD}/result.json \
   | pprint
 
