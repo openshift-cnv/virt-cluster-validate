@@ -35,6 +35,7 @@ Just drop a new dir and check into `checks.d/plugin-*` or create a new plugin if
 First you have to build the containerized plugins:
 
 ```console
+$ dnf install -y podman  # podman is required
 $ bash build-plugins.sh
 # BUILDING plugin-10-openshift.d/
 ...
