@@ -64,11 +64,11 @@ pprint() {
 | [
    if .step
    then
-     if .step.pass then "\(.step.level)" else "FAIL" end,
+     if .step.pass then "    \(.step.level)" else "[ ] FAIL" end,
      "- \(.plugin.name) / \(.check.displayname): \(.step.name)",
      "- \(.step.message)"
    else
-     if .check.pass then "PASS" else "FAIL" end,
+     if .check.pass then "[x] PASS" else "[ ] FAIL" end,
      "- \(.plugin.name) / \(.check.displayname)"
    end
 ] | join(" ")

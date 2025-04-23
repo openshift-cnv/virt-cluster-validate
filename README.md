@@ -55,32 +55,7 @@ $ oc project my-test-project  # Switch to the project where the testing can be p
 
 $ rm -rf results.d/*  # Cleanup any previous results
 $ virt-cluster-validate
-# Starting validation ...
-# Dispatching 'quay.io/virt-cluster-validate/plugin-10-openshift:latest' ...
-# Dispatching 'quay.io/virt-cluster-validate/plugin-50-openshift-virtualization:latest' ...
-# Waiting for jobs to complete
-# All jobs completed.
-# Summarizing results from '.../virt-cluster-validate/results.d/'
-PASS - plugin-10-openshift / Installation
-INFO - plugin-10-openshift / Nodes: Topology - Looks like a regular cluster.
-PASS - plugin-10-openshift / Nodes
-PASS - plugin-10-openshift / Host network
-PASS - plugin-10-openshift / Storage classes
-WARN - OpenShift Virtualization / Quota: Basic - There is a quota set on the namespace, this can break this validation. Please remove the quota if any test fails, and retry.
-PASS - OpenShift Virtualization / Quota
-INFO - OpenShift Virtualization / Storage profiles: Known - Some storage classes are not covered by storage profiles
-INFO - OpenShift Virtualization / Storage profiles: Clone - Some storage classes only support dumb cloning, leading to slow cloning and potentially slow VM launch times
-PASS - OpenShift Virtualization / Storage profiles
-PASS - OpenShift Virtualization / Secondary networks
-PASS - OpenShift Virtualization / Snapshots
-PASS - OpenShift Virtualization / Live Migration
-FAIL - OpenShift Virtualization / High Performance VMs: Scheduling - Unable to schedule high performance VMs. Is the CPU manager enabled?
-PASS - OpenShift Virtualization / High Performance VMs
-PASS - OpenShift Virtualization / Rebalancing
 
-real	1m46,773s
-user	0m0,076s
-sys	0m0,086s
 $
 ```
 

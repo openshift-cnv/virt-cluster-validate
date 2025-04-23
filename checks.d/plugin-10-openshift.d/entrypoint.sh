@@ -2,6 +2,8 @@
 
 set -x
 
+export PLUGIN_DISPLAYNAME="OpenShift"
+
 main() {
     for STEP in $(ls -1d ??-* | sort);
     do
