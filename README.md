@@ -3,6 +3,9 @@
 > This is an early stage prototype, it's runing unprivileged (thus is likely unable to do real harm),
 > but it might destroy workloads, and is at least difficult to debug right now.
 
+If [`virt-host-validate`](https://libvirt.org/manpages/virt-host-validate.html) is validating a hosts virtualization setup
+then this tool is validating a clusters virtualization setup.
+
 ## Objectives
 
 * Fast, timeboxed 3min
