@@ -36,13 +36,8 @@ First you have to build the containerized plugins:
 
 ```console
 $ bash build-plugins.sh
-~/work/openshift/virt-cluster-validate/checks.d ~/work/openshift/virt-cluster-validate
 # BUILDING plugin-10-openshift.d/
-STEP 1/10: FROM quay.io/fedora/fedora:latest
-STEP 2/10: RUN dnf install -y jq
-…
-+ ping
-+ echo pong from plugin-10-openshift
+...
 pong from plugin-10-openshift
 pong from OpenShift Virtualization
 $ 
@@ -64,7 +59,7 @@ $ virt-cluster-validate
 # Dispatching 'quay.io/virt-cluster-validate/plugin-50-openshift-virtualization:latest' ...
 # Waiting for jobs to complete
 # All jobs completed.
-# Summarizing results from '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d/'
+# Summarizing results from '.../virt-cluster-validate/results.d/'
 PASS - plugin-10-openshift / Installation
 INFO - plugin-10-openshift / Nodes: Topology - Looks like a regular cluster.
 PASS - plugin-10-openshift / Nodes
