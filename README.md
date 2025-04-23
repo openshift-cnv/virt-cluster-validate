@@ -21,8 +21,14 @@ However, with some work, testsuites can be consumed in this tool to prvide check
 
 ## Open items
 
-- Allow checks to be run locally
 - Improve debuggability
+- Allow checks to be run locally
+- Fetch `virtctl` and `oc` from the env
+- Decouple plugin building and running them
+
+## Extending
+
+Just drop a new dir and check into `checks.d/plugin-*` or create a new plugin if it's a different project, product, or vendor.
 
 ## Usage
 
@@ -72,12 +78,12 @@ PASS - OpenShift Virtualization / Storage profiles
 PASS - OpenShift Virtualization / Secondary networks
 PASS - OpenShift Virtualization / Snapshots
 PASS - OpenShift Virtualization / Live Migration
-FAIL - OpenShift Virtualization / : Scheduling - Unable to schedule high performance VMs. Is the CPU manager enabled?
-PASS - OpenShift Virtualization / 
+FAIL - OpenShift Virtualization / High Performance VMs: Scheduling - Unable to schedule high performance VMs. Is the CPU manager enabled?
+PASS - OpenShift Virtualization / High Performance VMs
 PASS - OpenShift Virtualization / Rebalancing
 
-real	1m34,687s
-user	0m0,097s
+real	1m46,773s
+user	0m0,076s
 sys	0m0,086s
 $
 ```
