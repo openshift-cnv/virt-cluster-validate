@@ -1,8 +1,5 @@
 #!/usr/bin/bash
 
-#mkdir /tmp/app
-#pushd /tmp/app
-
 #curl -sL http://downloads.openshift-console.svc.cluster.local/amd64/linux/oc.tar | tar xf -
 #curl -sL http://hyperconverged-cluster-cli-download.openshift-cnv.svc.cluster.local:8080/amd64/linux/virtctl.tar.gz | tar xfz -
 export PATH=$PATH:$PWD
@@ -15,33 +12,15 @@ green() { echo -e "\e[0;32m$@\e[0m" ; }
 die() { red "FATAL: $@" ; exit 1 ; }
 assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "Assertion ret 0 failed: '$@'" ; } ; green "(assert?) True" ; }
 
-#      oc get -n openshift-cnv hyperconverged hyperconverged
-
-BUILT_PLUGINS_INDEX="checks.d/generated-plugin-index.txt"
+export WD=${WD:-$PWD}
+export BUILT_PLUGINS_INDEX="generated-plugin-index.txt"
+export RESULTSD=${WD:-$PWD}/results.d/
 
 main() {
   c "Starting validation ..."
-  if [[ -f "$BUILT_PLUGINS_INDEX" ]];
-  then
-      main_with_containers
-  else
-    set -m  # job control
-    PLUGIN_FILTER="${1:-*}"
-    PLUGINS=$(ls -1d checks.d | grep -E "$PLUGIN_FILTER" | sort)
-    for PLUGIN in $PLUGINS
-    do
-      PLUGIN_RESULTS="$RESULTSD/$(echo $PLUGIN | tr "/:.-" "____").d/"
-      mkdir -p $PLUGIN_RESULTS
-      (
-          $PLUGIN
-      ) > $PLUGIN_RESULTS/cmdline 2>&1 &
-    done
+  run_checks $@
 
-    c "Waiting for jobs to complete" 
-    wait -f
-  fi
-
-  c "All jobs completed. Summarizing."
+  c "Summarizing results from '$RESULTSD'"
   cat ${RESULTSD}/*/result.json \
   | jq -s . \
   | jq '{apiVersion: "validate.kubevirt.io/v1alpha1", kind: "Results", items: .}' \
@@ -50,10 +29,9 @@ main() {
 
 }
 
-main_with_containers() {
-  local PLUGIN_FILTER="${1:-*}"
-  local PLUGINS=$(cat checks.d/generated-plugin-index.txt | grep -E "$PLUGIN_FILTER" | sort)
-  local RESULTSD=$PWD/results.d/
+run_checks() {
+  local PLUGIN_FILTER="${1:-.*}"
+  local PLUGINS=$(grep -E "$PLUGIN_FILTER" $BUILT_PLUGINS_INDEX | sort)
 
   set -m  # job control
   for PLUGIN in $PLUGINS
@@ -65,6 +43,8 @@ main_with_containers() {
     set -x
     podman -r run \
         --rm \
+        --env WD=/ \
+        --env RESULTSD=/results.d/ \
         --volume $PLUGIN_RESULTS:/results.d:rw,z \
         --volume $HOME/.kube:/.kube:ro,z \
         --volume $(which oc):/usr/bin/oc:ro,bind,exec,z \
@@ -79,25 +59,20 @@ main_with_containers() {
 }
 
 pprint() {
-#  if [[ -n "$AS_JSON" ]];
-#  then
-#    jq
-#  else
     jq -r '
 .items[]
 | [
-   if .step.pass then "PASS" else "FAIL" end,
-   "-",
-   .step.level,
-   "-",
-   .check.displayname,
-   "/",
-   .step.name,
-   "-",
-   .step.message ]
-| join(" ")
+   if .step
+   then
+     if .step.pass then "\(.step.level)" else "FAIL" end,
+     "- \(.plugin.name) / \(.check.displayname): \(.step.name)",
+     "- \(.step.message)"
+   else
+     if .check.pass then "PASS" else "FAIL" end,
+     "- \(.plugin.name) / \(.check.displayname)"
+   end
+] | join(" ")
 '
-#  fi
 }
 
 main $@

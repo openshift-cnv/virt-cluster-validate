@@ -8,8 +8,9 @@ install_oc() {
   echo TBD
 }
 
-WD="${WD:-(mktemp -d)}"
+WD="${WD:-$(mktemp -d)}"
 RESULTSD="${RESULTSD:-$WD}"
+RESULTFILE="${RESULTSD}/result.json"
 
 #
 # Internal
@@ -26,19 +27,23 @@ assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "A
 # Return results
 #
 append_result_json() {
+    [[ -z "$PLUGIN_NAME" ]] && die "PLUGIN_NAME must be set"
+    [[ -z "$CHECK_NAME" ]] && die "CHECK_NAME must be set"
+    [[ -z "$CHECK_DISPLAYNAME" ]] && die "CHECK_DISPLAYNAME must be set"
     [[ "$PASS" =~ true|false ]] || die "pass must be true or false"
-    [[ "$LVL" =~ INFO|WARN|FAIL ]] || die "level must be one of INFO WARN FAIL"
-    cat >> ${RESULTSD}/result.json <<EOJ
+    [[ "$LVL" =~ INFO|WARN|ERR ]] || die "level must be one of INFO WARN ERR"
+    cat <<EOJ | { if [[ -z "$STEP" ]]; then jq ".check.pass = $PASS | del(.step)"; else cat; fi  } >> $RESULTFILE
 {
   "plugin": {
-    "name": "$PLUGIN_NAME"
+    "name": "$PLUGIN_NAME",
+    "image": "$PLUGIN_IMAGE_URL"
   },
   "check": {
-    "name": "$CHECK_NAME"
-   },
+    "name": "$CHECK_NAME",
+    "displayname": "$CHECK_DISPLAYNAME"
+  },
   "step": {
     "name": "$STEP",
-    "displayname": "$DISPLAYNAME",
     "pass": $PASS,
     "level": "$LVL",
     "message": "$MESSAGE"
@@ -47,10 +52,10 @@ append_result_json() {
 EOJ
 }
  
-pass() { STEP= PASS=true LVL=INFO MESSAGE="$@" ; append_result_json ; }
-pass_with_warn() { STEP=$1 ; shift ; PASS=true LVL=WARN ; export MESSAGE="$@" ; append_result_json ; }
-pass_with_info() { STEP=$1 ; shift ; PASS=true LVL=INFO ; export MESSAGE="$@" ; append_result_json ; }
-fail_with() { STEP=$1 ; shift ; PASS=false LVL=FAIL MESSAGE="$@" ; append_result_json ; exit 1 ; }
+pass()           { STEP=""         ; PASS=true  LVL="INFO" MESSAGE="$@" ; append_result_json ; }
+pass_with_info() { STEP=$1 ; shift ; PASS=true  LVL="INFO" MESSAGE="$@" ; append_result_json ; }
+pass_with_warn() { STEP=$1 ; shift ; PASS=true  LVL="WARN" MESSAGE="$@" ; append_result_json ; }
+fail_with()      { STEP=$1 ; shift ; PASS=false LVL="ERR " MESSAGE="$@" ; append_result_json ; exit 1 ; }
 
 #
 # Expected to be called from external
@@ -60,8 +65,8 @@ run() { die "PLUGIN should provide this"; }
 cleanup() { die "PLUGIN should provide this"; }
 main() {
   local LOG_FILE="${RESULTSD}/log.txt"
-  local DISPLAYNAME=${DISPLAYNAME:-$CHECK}
 
+export CHECK_DISPLAYNAME=${CHECK_DISPLAYNAME:-$CHECK_NAME}
   export PASS=true LVL= MESSAGE= STEP=
 
   (

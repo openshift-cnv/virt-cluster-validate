@@ -2,7 +2,6 @@
 
 source ../lib.sh
 
-export CHECK_NAME="$BASH_SOURCE"
 export CHECK_DISPLAYNAME="Installation"
 
 run() {

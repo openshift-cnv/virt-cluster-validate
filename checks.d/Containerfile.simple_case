@@ -1,6 +1,15 @@
-FROM ${CONTAINERIMAGE_BASE:-quay.io/fedora/fedora:latest}
+FROM quay.io/fedora/fedora:latest
+
+RUN dnf install -y jq
+
+ARG PLUGIN_NAME
+ARG PLUGIN_IMAGE_URL
 
 ENV HOME /
+ENV PLUGIN_NAME $PLUGIN_NAME
+ENV PLUGIN_IMAGE_URL $PLUGIN_IMAGE_URL
+
 RUN mkdir /results.d
 ADD . /
+
 ENTRYPOINT ["/entrypoint.sh"]

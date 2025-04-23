@@ -2,7 +2,7 @@
 
 source ../lib.sh
 
-DISPLAYNAME="High Performance VMs"
+CHECK_DISPLAYNAME="High Performance VMs"
 
 run() {
   virtctl create vm --instancetype cx1.medium --volume-import=type:ds,src:openshift-virtualization-os-images/fedora | tee vm.yaml
