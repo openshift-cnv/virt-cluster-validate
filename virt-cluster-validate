@@ -69,7 +69,7 @@ pprint() {
      "- \(.step.message)"
    else
      if .check.pass then "[x] PASS" else "[ ] FAIL" end,
-     "- \(.plugin.name) / \(.check.displayname)"
+     "- \(.plugin.name) / \(.check.displayname): \(.step.message)"
    end
 ] | join(" ")
 '

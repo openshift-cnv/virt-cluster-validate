@@ -40,7 +40,8 @@ append_result_json() {
   },
   "check": {
     "name": "$CHECK_NAME",
-    "displayname": "$CHECK_DISPLAYNAME"
+    "displayname": "$CHECK_DISPLAYNAME",
+    "message": "$MESSAGE"
   },
   "step": {
     "name": "$STEP",
