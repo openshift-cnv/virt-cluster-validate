@@ -36,6 +36,7 @@ append_result_json() {
 {
   "plugin": {
     "name": "$PLUGIN_NAME",
+    "displayname": "$PLUGIN_DISPLAYNAME",
     "image": "$PLUGIN_IMAGE_URL"
   },
   "check": {

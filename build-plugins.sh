@@ -16,10 +16,12 @@ do
     (
     PLUGIN_NAME=${PLUGIN_DIR%.*}
     PLUGIN_URL=$IMG_REPO_PREFIX/$PLUGIN_NAME:$IMG_TAG
+    set -x
     podman -r \
         build $PLUGIN_DIR/ \
         -f Containerfile.simple_case \
         --build-arg PLUGIN_NAME="$PLUGIN_NAME" \
+        --build-arg PLUGIN_DISPLAYNAME="${PLUGIN_NAME#plugin-*-}" \
         --build-arg PLUGIN_IMAGE_URL="$PLUGIN_URL" \
         --cache-ttl 4h \
         --tag $PLUGIN_URL
