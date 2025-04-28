@@ -9,7 +9,7 @@ run() {
   oc create -f vm.yaml
 
   oc wait --for=condition=Ready=true -f vm.yaml \
-  || ( oc get -o yaml -f vm.yaml; fail_with Scheduling "Unable to schedule high performance VMs. Is the CPU manager enabled?"; )
+  || { oc get -o yaml -f vm.yaml; fail_with Scheduling "Unable to schedule high performance VMs. Is the CPU manager enabled?"; }
 }
 
 cleanup() {
