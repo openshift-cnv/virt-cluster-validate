@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-PLUGIN_NAME="OpenShift Virtualization"
+PLUGIN_DISPLAYNAME="OpenShift Virtualization"
 
 main() {
     set -m
