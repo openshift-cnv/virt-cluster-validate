@@ -5,7 +5,7 @@ source ../lib.sh
 export CHECK_DISPLAYNAME="Bare Metal"
 
 run() {
-  local INFRA=$(oc get infrastructure cluster -o json | jq -e '.spec.platformSpec.type')
+  local INFRA=$(oc get infrastructure cluster -o json | jq -re '.spec.platformSpec.type')
 
   case "$INFRA" in
     BareMetal|None) pass_with_info Infrastructure "Platform '$INFRA'" ;;
