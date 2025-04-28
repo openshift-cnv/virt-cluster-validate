@@ -10,7 +10,7 @@ install_oc() {
 
 WD="${WD:-$(mktemp -d)}"
 RESULTSD="${RESULTSD:-$WD}"
-RESULTFILE="${RESULTSD}/result.json"
+RESULTFILE="${RESULTFILE:-${RESULTSD}/result.json}"
 
 #
 # Internal
