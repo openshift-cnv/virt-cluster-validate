@@ -17,39 +17,43 @@ export BUILT_PLUGINS_INDEX="generated-plugin-index.txt"
 export RESULTSD=${WD:-$PWD}/results.d/
 
 main() {
-  c "Starting validation ..."
-  [[ -f "${RESULTSD}/result.json" ]] || run_checks $@
+  _gather_data
+  _display_data
+}
 
+_gather_data() {
+  c "Starting validation ..."
+  [[ -f "${RESULTSD}/result.json" ]] || run_plugins $@
+}
+
+_display_data() {
   c "Summarizing results from '$RESULTSD'"
   cat ${RESULTSD}/*/result.json \
   | jq -s . \
   | jq '{apiVersion: "validate.virtualization.openshift.com/v1alpha1", kind: "Results", items: .}' \
   | tee ${RESULTSD}/result.json \
   | pprint
-
 }
 
-run_checks() {
+run_plugins() {
   local PLUGIN_FILTER="${1:-.*}"
   local PLUGINS=$(grep -E "$PLUGIN_FILTER" $BUILT_PLUGINS_INDEX | sort)
 
-  set -m  # job control
-  echo -e "$PLUGINS" | xargs -n 1 -P 10 -- $0 run_check 
-
   c "Waiting for jobs to complete" 
-  wait -f
+
+  echo -e "$PLUGINS" | xargs -n 1 -P 10 -- $0 run_plugin
+
   c "All jobs completed."
 }
 
-run_check() {
-  c "Dispatching '$PLUGIN' ..."
-
-  set -x
-
+run_plugin() {
   local PLUGIN="$1"
   local PLUGIN_RESULTS="$RESULTSD/$(echo $PLUGIN | tr "/:.-" "____").d/"
 
+  c "Dispatching '$PLUGIN' ..."
+
   mkdir -p $PLUGIN_RESULTS
+  pushd $PLUGIN_RESULTS
 
   (
   podman -r run \
@@ -62,6 +66,8 @@ run_check() {
       --volume $(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \
       $PLUGIN
   ) > $PLUGIN_RESULTS/cmdline 2>&1
+
+  # fixme we can not trust plugins thus we should generate metadata, hower simpler to do from within plugin
 }
 
 pprint() {
@@ -70,9 +76,12 @@ pprint() {
 | [
    if .step and .step.pass
    then "    \(.step.level) - \(.plugin.name)   + \(.check.displayname)@\(.step.name) - \(.step.message)"
+
    elif .check and .check.pass
    then "[x] PASS - \(.plugin.name) ### \(.check.displayname)"
+
    elif .check and .step
+
    then
      "    \(.step.level) - \(.plugin.name) --- \(.check.displayname)@\(.step.name) - \(.step.message)\n"
      + "[ ] FAIL - \(.plugin.name) ### \(.check.displayname)"

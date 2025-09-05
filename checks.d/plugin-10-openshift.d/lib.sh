@@ -23,42 +23,87 @@ green() { echo -e "\e[0;32m$@\e[0m" ; }
 die() { red "FATAL: $@" ; exit 1 ; }
 assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "Assertion ret 0 failed: '$@'" ; } ; green "(assert?) True" ; }
 
-#
-# Return results
-#
-append_result_json() {
-    [[ -z "$PLUGIN_NAME" ]] && die "PLUGIN_NAME must be set"
-    [[ -z "$CHECK_NAME" ]] && die "CHECK_NAME must be set"
-    [[ -z "$CHECK_DISPLAYNAME" ]] && die "CHECK_DISPLAYNAME must be set"
-    [[ "$PASS" =~ true|false ]] || die "pass must be true or false"
-    [[ "$LVL" =~ INFO|WARN|ERR ]] || die "level must be one of INFO WARN ERR"
-    cat <<EOJ | { if [[ -z "$STEP" ]]; then jq "del(.step)"; else cat; fi  } >> $RESULTFILE
+
+# a plugin is a containerimage, it fails if any check fails
+# a plugin has many checks, it fails if any step fails
+# a check has many steps, each can fail, warn, or info
+
+plugin_metadata() {
+  [[ -z "$1" ]] && die "PLUGIN_NAME must be set"
+  [[ -z "$2" ]] && die "PLUGIN_DISPLAYNAME must be set"
+  jq -e "." > result.json <<EOJ
 {
-  "plugin": {
-    "name": "$PLUGIN_NAME",
-    "displayname": "$PLUGIN_DISPLAYNAME",
-    "image": "$PLUGIN_IMAGE_URL"
+  "kind": "Plugin",
+  "metadata": {
+    "name": "$1",
+    "displayname": "$2",
+    "containerImage": "$3"
   },
-  "check": {
-    "name": "$CHECK_NAME",
-    "displayname": "$CHECK_DISPLAYNAME",
-    "message": "$MESSAGE",
-    "pass": ${CHECK_PASS:-true}
+  "status": {
+    "pass": true
+  }
+EOJ
+}
+
+check_metadata() {
+  [[ -z "$1" ]] && die "CHECK_NAME must be set"
+  [[ -z "$2" ]] && die "CHECK_DISPLAYNAME must be set"
+  [[ "$3" =~ true|false ]] || die "pass must be true or false"
+  jq -e "." > result.json <<EOJ
+{
+  "kind": "Check",
+  "metadata": {
+    "name": "$1",
+    "displayname": "$2",
   },
-  "step": {
-    "name": "$STEP",
-    "pass": $PASS,
-    "level": "$LVL",
-    "message": "$MESSAGE"
+  "status": {
+    "pass": true
+    "message": "$4"
   }
 }
 EOJ
 }
+check() {
+  check_metadata > $1.check.result.json
+}
+
+step_metadata() {
+  [[ -z "$1" ]] && die "STEP_NAME must be set"
+  jq -e "." > result.json <<EOJ
+{
+  "kind": "Step",
+  "metadata": {
+    "name": "$1",
+  },
+  "status": {
+    "pass": true
+    "level": "",
+    "message": ""
+  }
+}
+EOJ
+}
+step() {
+  local STEP_NAME="$1"
+  local STEP_NO=$(ls -1 *.step.result.json | wc -l)
+  step_metadata $STEP_NAME > "${STEP_NO}-${STEP_NAME}".step.result.json
+}
+last_step_file() { ls -1 *.step.result.json | sort -h | tail -n 1 ; }
+jq_update_last_step_file() {
+  cat "$(last_step_file)" | jq -e $@ > ".tmp.$(last_step_file)" ;
+  mv ".tmp.$(last_step_file)" "$(last_step_file)" ; }
+
+#
+# Return results
+#
  
-pass()           { STEP=""         ; PASS=true  LVL="INFO" MESSAGE="$@" ; append_result_json ; }
-pass_with_info() { STEP=$1 ; shift ; PASS=true  LVL="INFO" MESSAGE="$@" ; append_result_json ; }
-pass_with_warn() { STEP=$1 ; shift ; PASS=true  LVL="WARN" MESSAGE="$@" ; append_result_json ; }
-fail_with()      { STEP=$1 ; shift ; PASS=false LVL="ERR " MESSAGE="$@" CHECK_PASS=false ; append_result_json ; exit 1 ; }
+pass()           { true ; }
+pass_with_info() {
+  jq_update_last_step_file -e --arg msg $1 '. | .status.level = "info" | .status.message = msg'; }
+pass_with_warn() {
+  jq_update_last_step_file -e --arg msg $1 '. | .status.level = "warn" | .status.message = msg'; }
+fail_with() {
+  jq_update_last_step_file -e --arg msg $1 '. | .status.pass = false | .status.level = "err" | .status.message = msg'; }
 
 #
 # Expected to be called from external
@@ -66,6 +111,8 @@ fail_with()      { STEP=$1 ; shift ; PASS=false LVL="ERR " MESSAGE="$@" CHECK_PA
 ping() { echo "pong  # $DISPLAYNAME $(date)" | tee /results.d/pong; }
 run() { die "PLUGIN should provide this"; }
 cleanup() { die "PLUGIN should provide this"; }
+
+# mian of a chcek
 main() {
   local LOG_FILE="${RESULTSD}/log.txt"
 
@@ -75,6 +122,7 @@ export CHECK_DISPLAYNAME=${CHECK_DISPLAYNAME:-$CHECK_NAME}
   (
     set -x
     pushd $WD
+    plugin "
     run
     pass
     cleanup

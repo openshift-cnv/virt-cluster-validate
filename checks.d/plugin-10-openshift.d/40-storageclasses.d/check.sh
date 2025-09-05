@@ -5,7 +5,7 @@ source ../lib.sh
 export CHECK_DISPLAYNAME="Storage classes"
 
 run() {
-  oc get storageclasses -o json > storageclasses.json
+  oc get storageclasses -o json > storageclasses.json || fail_with Connection "Unable to get storageclasses from cluster"
 
   cat storageclasses.json \
   | jq -e '.items | length > 0' \
