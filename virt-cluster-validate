@@ -46,7 +46,7 @@ run_plugins() {
       --volume $(which oc):/usr/bin/oc:ro,bind,exec,z \
       --volume $(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \
       quay.io/openshift-virtualization/virt-cluster-validate \
-      bash -e -c 'export PATH=$PATH:/app/bin ; testrunner "$TEST_FILTER"'
+      "$TEST_FILTER"
 }
 
 _display_data() {
