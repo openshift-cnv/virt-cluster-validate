@@ -86,31 +86,31 @@ PASS plugin-10-openshift.d/00-installation.d/
 PASS plugin-10-openshift.d/10-nodes.d/
      INFO: Topology Looks like a regular cluster.
      INFO: Remediation Node remediation is provided by MachineHealthChecks
-     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-10-openshift.d/10-nodes.d//log.txt' for more details
+     See './plugin-10-openshift.d/10-nodes.d//log.txt' for more details
 PASS plugin-10-openshift.d/11-host-network.d/
 PASS plugin-10-openshift.d/30-monitoring.d/
 PASS plugin-10-openshift.d/40-storageclasses.d/
 PASS plugin-50-openshift-virtualization.d/00-installation.d/
 PASS plugin-50-openshift-virtualization.d/10-quota.d/
      WARN: Basic There is a quota set on the namespace, this can break this validation. Please remove the quota if any test fails, and retry.
-     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/10-quota.d//log.txt' for more details
+     See './plugin-50-openshift-virtualization.d/10-quota.d//log.txt' for more details
 PASS plugin-50-openshift-virtualization.d/20-bare-metal.d/
      INFO: Infrastructure Platform 'BareMetal'
-     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/20-bare-metal.d//log.txt' for more details
+     See './plugin-50-openshift-virtualization.d/20-bare-metal.d//log.txt' for more details
 PASS plugin-50-openshift-virtualization.d/40-storageprofiles.d/
      INFO: Known Some storage classes are not covered by storage profiles
      INFO: Clone Some storage classes only support dumb cloning, leading to slow cloning and potentially slow VM launch times
-     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/40-storageprofiles.d//log.txt' for more details
+     See './plugin-50-openshift-virtualization.d/40-storageprofiles.d//log.txt' for more details
 PASS plugin-50-openshift-virtualization.d/45-network.d/
 FAIL plugin-50-openshift-virtualization.d/50-snapshots.d/
      FAIL: Create Failed to create snapshot with default storageclass
-     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/50-snapshots.d//log.txt' for more details
+     See './plugin-50-openshift-virtualization.d/50-snapshots.d//log.txt' for more details
 FAIL plugin-50-openshift-virtualization.d/70-live-migration.d/
      FAIL: Scheduling Unable to schedule VMs?
-     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/70-live-migration.d//log.txt' for more details
+     See './plugin-50-openshift-virtualization.d/70-live-migration.d//log.txt' for more details
 FAIL plugin-50-openshift-virtualization.d/80-high-performance.d/
      FAIL: Scheduling Unable to schedule high performance VMs. Is the CPU manager enabled?
-     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/80-high-performance.d//log.txt' for more details
+     See './plugin-50-openshift-virtualization.d/80-high-performance.d//log.txt' for more details
 PASS plugin-50-openshift-virtualization.d/81-rebalance.d/
 # Di 9. Sep 11:51:58 CEST 2025
 
