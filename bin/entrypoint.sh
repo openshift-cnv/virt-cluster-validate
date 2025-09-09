@@ -4,7 +4,7 @@ set -e
 
 export PATH=$PATH:/app/bin
 
-if [[ -z "$@" ]];
+if [[ "$1" = "podman-args" ]];
 then
 # arguments for podman
 cat <<EOC
