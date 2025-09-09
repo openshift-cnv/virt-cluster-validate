@@ -6,14 +6,14 @@ export PATH=$PATH:/app/bin
 
 if [[ -z "$@" ]];
 then
+# arguments for podman
 cat <<EOC
-  podman -r run \
-      --rm \
       --env WD=/ \
       --env HOME=/ \
       --env RESULTSD=/results.d/ \
       --env NUM_CONCURRENT_TESTS=42 \
-      --env TEST_FITER="\$PLUGIN_FILTER" \
+      --env SINGLE_TEST_TIMEOUT=5m \
+      --env TEST_FILTER="\$PLUGIN_FILTER" \
       --volume \$PWD:/app:ro,z \
       --volume \$RESULTSD:/results.d:rw,z \
       --volume \$HOME/.kube:/.kube:ro,z \

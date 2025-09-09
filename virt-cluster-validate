@@ -11,6 +11,8 @@ x() { echo "\$ $@" ; eval "$@" ; }
 export WD=${WD:-$PWD}
 export RESULTSD=${WD:-$PWD}/results.d/
 
+export IMAGEURL=quay.io/openshift-virtualization/virt-cluster-validate
+
 main() {
   c "$0 ($(git rev-parse --short HEAD))"
   c "$(date)"
@@ -24,15 +26,10 @@ _gather_data() {
 
 run_plugins() {
   c "Building container image"
-
   podman -r build --quiet -t quay.io/openshift-virtualization/virt-cluster-validate .
 
   c "Starting validation ..."
-
-  IMAGEURL=quay.io/openshift-virtualization/virt-cluster-validate
-  eval $(podman -r run $IMAGEURL)
-
-  eval $CMD_TO_RUN
+  eval podman -r run --rm $(podman -r run $IMAGEURL)
 }
 
 _display_data_json() {
