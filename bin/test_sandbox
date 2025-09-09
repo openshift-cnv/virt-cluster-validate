@@ -1,9 +1,18 @@
 #!/usr/bin/bash
 
+#set -x
 set -e
 
 TESTFILE="$1"
 
-pushd $(dirname $TESTFILE)
-bash -ex $TESTFILE
-touch PASS
+echo "Running '$TESTFILE'"
+
+(
+  pushd $(dirname $TESTFILE)
+  bash -ex $(basename $TESTFILE) || ( touch FAIL ; ln -s FAIL result ; exit 1 ; ) ;
+) > log.txt 2>&1
+
+  touch PASS
+  ln -s PASS result
+
+echo "Completed '$TESTFILE'"

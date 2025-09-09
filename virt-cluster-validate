@@ -9,6 +9,7 @@ n() { echo "" ; }
 x() { echo "\$ $@" ; eval "$@" ; }
 red() { echo -e "\e[0;31m$@\e[0m" ; }
 green() { echo -e "\e[0;32m$@\e[0m" ; }
+colorfy() { sed "s/${1:-err\|fail}/\x1b[31m&\x1b[0m/gI ; s/${2:-pass}/\x1b[32m&\x1b[0m/gI" ; }
 die() { red "FATAL: $@" ; exit 1 ; }
 assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "Assertion ret 0 failed: '$@'" ; } ; green "(assert?) True" ; }
 
@@ -18,7 +19,7 @@ export RESULTSD=${WD:-$PWD}/results.d/
 
 main() {
   _gather_data
-  #_display_data
+  _display_data
 }
 
 _gather_data() {
@@ -29,23 +30,32 @@ _gather_data() {
 run_plugins() {
   local PLUGIN_FILTER="${1:-.*}"
 
+  podman -r build -t quay.io/openshift-virtualization/virt-cluster-validate -f Containerfile .
+
   podman -r run \
       --rm \
       --env WD=/ \
       --env HOME=/ \
       --env RESULTSD=/results.d/ \
-      --env NUM_CONCURRENT_TESTS=10 \
+      --env NUM_CONCURRENT_TESTS=42 \
       --env TEST_FITER="$PLUGIN_FILTER" \
       --volume $PWD:/app:ro,z \
       --volume $PWD/results.d:/results.d:rw,z \
       --volume $HOME/.kube:/.kube:ro,z \
       --volume $(which oc):/usr/bin/oc:ro,bind,exec,z \
       --volume $(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \
-      fedora:latest \
-      bash -e -c 'export PATH=$PATH:/app/bin ; prepare ; testrunner "$TEST_FILTER"'
+      quay.io/openshift-virtualization/virt-cluster-validate \
+      bash -e -c 'export PATH=$PATH:/app/bin ; testrunner "$TEST_FILTER"'
 }
 
 _display_data() {
+  find $PWD/results.d/*.d/*.d/ -type d | while read TESTDIR; do
+    echo $(readlink $TESTDIR/result) $TESTDIR
+    for C in FAIL INFO WARN; do [[ -f $TESTDIR/$C ]] && sed "s/^/  /" $TESTDIR/$C ; done
+  done | colorfy
+}
+
+_display_data_json() {
   c "Summarizing results from '$RESULTSD'"
   cat ${RESULTSD}/*/result.json \
   | jq -s . \

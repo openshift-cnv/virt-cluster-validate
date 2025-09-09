@@ -1,11 +1,14 @@
 #!/usr/bin/bash
 
+#set -x
 set -e
 
 cp -a --reflink /app/checks.d/* "$RESULTSD"
 
-cd results.d
-find . -wholename *.test \
+#find "$RESULTSD"
+cd "$RESULTSD"
+
+find . -name test.sh \
 | grep -E "$1" \
 | sort -h \
 | xargs -n 1 -P ${NUM_CONCURRENT_TESTS:-1} -- test_sandbox
