@@ -7,30 +7,31 @@ export PATH=$PATH:$PWD
 c() { echo "# $@" ; }
 n() { echo "" ; }
 x() { echo "\$ $@" ; eval "$@" ; }
-red() { echo -e "\e[0;31m$@\e[0m" ; }
-green() { echo -e "\e[0;32m$@\e[0m" ; }
-colorfy() { sed "s/${1:-err\|fail}/\x1b[31m&\x1b[0m/gI ; s/${2:-pass}/\x1b[32m&\x1b[0m/gI" ; }
-die() { red "FATAL: $@" ; exit 1 ; }
-assert() { echo "(assert:) \$ $@" ; eval $@ || { echo "(assert?) FALSE" ; die "Assertion ret 0 failed: '$@'" ; } ; green "(assert?) True" ; }
+colorfy() { sed "s/${1:-err\|fail}/\x1b[1;31m&\x1b[0m/I ; s/${2:-pass}/\x1b[1;32m&\x1b[0m/I ; s/${2:-info\|warn}/\x1b[34m&\x1b[0m/I" ; }
 
 export WD=${WD:-$PWD}
-export BUILT_PLUGINS_INDEX="generated-plugin-index.txt"
 export RESULTSD=${WD:-$PWD}/results.d/
 
 main() {
+  c "$0 ($(git rev-parse --short HEAD))"
+  c "$(date)"
   _gather_data
   _display_data
+  c "$(date)"
 }
 
 _gather_data() {
-  c "Starting validation ..."
   run_plugins $@
 }
 
 run_plugins() {
   local PLUGIN_FILTER="${1:-.*}"
 
-  podman -r build -t quay.io/openshift-virtualization/virt-cluster-validate -f Containerfile .
+  c "Building container image"
+
+  podman -r build --quiet -t quay.io/openshift-virtualization/virt-cluster-validate .
+
+  c "Starting validation ..."
 
   podman -r run \
       --rm \
@@ -40,7 +41,7 @@ run_plugins() {
       --env NUM_CONCURRENT_TESTS=42 \
       --env TEST_FITER="$PLUGIN_FILTER" \
       --volume $PWD:/app:ro,z \
-      --volume $PWD/results.d:/results.d:rw,z \
+      --volume $RESULTSD:/results.d:rw,z \
       --volume $HOME/.kube:/.kube:ro,z \
       --volume $(which oc):/usr/bin/oc:ro,bind,exec,z \
       --volume $(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \
@@ -49,9 +50,12 @@ run_plugins() {
 }
 
 _display_data() {
-  find $PWD/results.d/*.d/*.d/ -type d | while read TESTDIR; do
+  cd $RESULTSD
+  find *.d/*.d/ -type d | sort -h | while read TESTDIR; do
     echo $(readlink $TESTDIR/result) $TESTDIR
-    for C in FAIL INFO WARN; do [[ -f $TESTDIR/$C ]] && sed "s/^/  /" $TESTDIR/$C ; done
+    HAD_DETAILS=false
+    for C in FAIL INFO WARN; do [[ -f $TESTDIR/$C ]] && { sed "s/^/     /" $TESTDIR/$C ; HAD_DETAILS=true ; } ; done
+    $HAD_DETAILS && echo "     See '$RESULTSD/$TESTDIR/log.txt' for more details"
   done | colorfy
 }
 

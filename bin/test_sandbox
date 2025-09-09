@@ -4,15 +4,15 @@
 set -e
 
 TESTFILE="$1"
+TESTDIR=$(dirname $TESTFILE)
 
 echo "Running '$TESTFILE'"
 
 (
-  pushd $(dirname $TESTFILE)
-  bash -ex $(basename $TESTFILE) || ( touch FAIL ; ln -s FAIL result ; exit 1 ; ) ;
-) > log.txt 2>&1
-
+  pushd $TESTDIR
+  timeout 5m  bash -ex $(basename $TESTFILE) || ( touch FAIL ; ln -s FAIL result ; exit 1 ; ) ;
   touch PASS
   ln -s PASS result
+) > $TESTDIR/log.txt 2>&1
 
 echo "Completed '$TESTFILE'"

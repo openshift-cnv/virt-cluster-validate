@@ -24,7 +24,10 @@ EOF
 oc apply -f snap.yaml
 
 oc wait -f snap.yaml --for condition=Ready \
-|| fail_with Create  "Failed to create snapshot with default storageclass"
+|| (
+  oc get -o yaml -f snap.yaml
+  fail_with Create  "Failed to create snapshot with default storageclass"
+)
 
 tee restore.yaml <<EOF
 apiVersion: snapshot.kubevirt.io/v1alpha1
@@ -40,4 +43,7 @@ spec:
 EOF
 oc apply -f restore.yaml
 oc wait -f restore.yaml --for condition=Ready \
-|| fail_with Restore  "Failed to restore snapshots"
+|| (
+  oc get -o yaml -f restore.yaml
+  fail_with Restore  "Failed to restore snapshots"
+)
