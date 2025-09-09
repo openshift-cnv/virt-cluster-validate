@@ -95,3 +95,9 @@ user	0m0,128s
 sys	0m0,113s
 $
 ```
+
+## Usage - With the container only
+
+You can also run the tool with the container only by running
+
+    eval podman -r run --rm $(podman -r run $IMAGEURL podman-args)

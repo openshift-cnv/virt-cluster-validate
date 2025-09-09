@@ -26,10 +26,10 @@ _gather_data() {
 
 run_plugins() {
   c "Building container image"
-  podman -r build --quiet -t quay.io/openshift-virtualization/virt-cluster-validate .
+  podman -r build --quiet -t $IMAGEURL .
 
   c "Starting validation ..."
-  eval podman -r run --rm $(podman -r run $IMAGEURL podman-args)
+  eval "podman -r run --rm --volume $PWD:/app:ro,z $(podman -r run $IMAGEURL podman-args) $IMAGEURL"
 }
 
 _display_data_json() {

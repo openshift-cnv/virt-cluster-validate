@@ -1,7 +1,5 @@
 #!/usr/bin/bash
 
-set -e
-
 export PATH=$PATH:/app/bin
 
 if [[ "$1" = "podman-args" ]];
@@ -14,13 +12,10 @@ cat <<EOC
       --env NUM_CONCURRENT_TESTS=42 \
       --env SINGLE_TEST_TIMEOUT=5m \
       --env TEST_FILTER="\$PLUGIN_FILTER" \
-      --volume \$PWD:/app:ro,z \
-      --volume \$RESULTSD:/results.d:rw,z \
+      --volume \${RESULTSD:-\$PWD/results.d/}:/results.d:rw,z \
       --volume \$HOME/.kube:/.kube:ro,z \
       --volume \$(which oc):/usr/bin/oc:ro,bind,exec,z \
-      --volume \$(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \
-      \$IMAGEURL \
-      testrunner
+      --volume \$(which virtctl):/usr/bin/virtctl:ro,bind,exec,z
 EOC
   exit 0
 else
