@@ -39,12 +39,6 @@ First you have to build the containerized plugins:
 
 ```console
 $ dnf install -y podman  # podman is required
-$ bash build-plugins.sh
-# BUILDING plugin-10-openshift.d/
-...
-pong from plugin-10-openshift
-pong from OpenShift Virtualization
-$ 
 ```
 
 Now you can run the checks:
@@ -58,53 +52,70 @@ $ oc project my-test-project  # Switch to the project where the testing can be p
 
 $ rm -rf results.d/*  # Cleanup any previous results
 $ virt-cluster-validate
+# virt-cluster-validate (3d47616)
+# Di 9. Sep 11:49:53 CEST 2025
+# Building container image
+61534bf9f0d8a71cd17d0026fab19346cd472bda4648069ef65eada98e8b1872
 # Starting validation ...
-# Dispatching 'quay.io/virt-cluster-validate/plugin-10-openshift:latest' ...
-# Dispatching 'quay.io/virt-cluster-validate/plugin-50-openshift-virtualization:latest' ...
-# Waiting for jobs to complete
-# All jobs completed.
-# Summarizing results from '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d/'
-[x] PASS - plugin-10-openshift / Installation
-    INFO - plugin-10-openshift / Nodes: Topology - Looks like a regular cluster.
-[x] PASS - plugin-10-openshift / Nodes
-[x] PASS - plugin-10-openshift / Host network
-[x] PASS - plugin-10-openshift / Storage classes
-    WARN - OpenShift Virtualization / Quota: Basic - There is a quota set on the namespace, this can break this validation. Please remove the quota if any test fails, and retry.
-[x] PASS - OpenShift Virtualization / Quota
-    INFO - OpenShift Virtualization / Storage profiles: Known - Some storage classes are not covered by storage profiles
-    INFO - OpenShift Virtualization / Storage profiles: Clone - Some storage classes only support dumb cloning, leading to slow cloning and potentially slow VM launch times
-[x] PASS - OpenShift Virtualization / Storage profiles
-[x] PASS - OpenShift Virtualization / Secondary networks
-[x] PASS - OpenShift Virtualization / Snapshots
-[x] PASS - OpenShift Virtualization / Live Migration
-[ ] FAIL - OpenShift Virtualization / High Performance VMs: Scheduling - Unable to schedule high performance VMs. Is the CPU manager enabled?
-[x] PASS - OpenShift Virtualization / High Performance VMs
-[x] PASS - OpenShift Virtualization / Rebalancing
+Running './plugin-10-openshift.d/00-installation.d/test.sh'
+Running './plugin-10-openshift.d/10-nodes.d/test.sh'
+Running './plugin-10-openshift.d/11-host-network.d/test.sh'
+Running './plugin-10-openshift.d/30-monitoring.d/test.sh'
+Running './plugin-10-openshift.d/40-storageclasses.d/test.sh'
+Running './plugin-50-openshift-virtualization.d/00-installation.d/test.sh'
+Running './plugin-50-openshift-virtualization.d/10-quota.d/test.sh'
+Running './plugin-50-openshift-virtualization.d/20-bare-metal.d/test.sh'
+Running './plugin-50-openshift-virtualization.d/40-storageprofiles.d/test.sh'
+Running './plugin-50-openshift-virtualization.d/45-network.d/test.sh'
+Running './plugin-50-openshift-virtualization.d/50-snapshots.d/test.sh'
+Running './plugin-50-openshift-virtualization.d/70-live-migration.d/test.sh'
+Running './plugin-50-openshift-virtualization.d/80-high-performance.d/test.sh'
+Running './plugin-50-openshift-virtualization.d/81-rebalance.d/test.sh'
+Completed './plugin-50-openshift-virtualization.d/81-rebalance.d/test.sh'
+Completed './plugin-10-openshift.d/11-host-network.d/test.sh'
+Completed './plugin-10-openshift.d/30-monitoring.d/test.sh'
+Completed './plugin-50-openshift-virtualization.d/20-bare-metal.d/test.sh'
+Completed './plugin-50-openshift-virtualization.d/10-quota.d/test.sh'
+Completed './plugin-10-openshift.d/40-storageclasses.d/test.sh'
+Completed './plugin-50-openshift-virtualization.d/40-storageprofiles.d/test.sh'
+Completed './plugin-50-openshift-virtualization.d/00-installation.d/test.sh'
+Completed './plugin-50-openshift-virtualization.d/45-network.d/test.sh'
+Completed './plugin-10-openshift.d/00-installation.d/test.sh'
+Completed './plugin-10-openshift.d/10-nodes.d/test.sh'
+PASS plugin-10-openshift.d/00-installation.d/
+PASS plugin-10-openshift.d/10-nodes.d/
+     INFO: Topology Looks like a regular cluster.
+     INFO: Remediation Node remediation is provided by MachineHealthChecks
+     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-10-openshift.d/10-nodes.d//log.txt' for more details
+PASS plugin-10-openshift.d/11-host-network.d/
+PASS plugin-10-openshift.d/30-monitoring.d/
+PASS plugin-10-openshift.d/40-storageclasses.d/
+PASS plugin-50-openshift-virtualization.d/00-installation.d/
+PASS plugin-50-openshift-virtualization.d/10-quota.d/
+     WARN: Basic There is a quota set on the namespace, this can break this validation. Please remove the quota if any test fails, and retry.
+     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/10-quota.d//log.txt' for more details
+PASS plugin-50-openshift-virtualization.d/20-bare-metal.d/
+     INFO: Infrastructure Platform 'BareMetal'
+     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/20-bare-metal.d//log.txt' for more details
+PASS plugin-50-openshift-virtualization.d/40-storageprofiles.d/
+     INFO: Known Some storage classes are not covered by storage profiles
+     INFO: Clone Some storage classes only support dumb cloning, leading to slow cloning and potentially slow VM launch times
+     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/40-storageprofiles.d//log.txt' for more details
+PASS plugin-50-openshift-virtualization.d/45-network.d/
+FAIL plugin-50-openshift-virtualization.d/50-snapshots.d/
+     FAIL: Create Failed to create snapshot with default storageclass
+     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/50-snapshots.d//log.txt' for more details
+FAIL plugin-50-openshift-virtualization.d/70-live-migration.d/
+     FAIL: Scheduling Unable to schedule VMs?
+     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/70-live-migration.d//log.txt' for more details
+FAIL plugin-50-openshift-virtualization.d/80-high-performance.d/
+     FAIL: Scheduling Unable to schedule high performance VMs. Is the CPU manager enabled?
+     See '/var/home/fabiand/work/openshift/virt-cluster-validate/results.d//plugin-50-openshift-virtualization.d/80-high-performance.d//log.txt' for more details
+PASS plugin-50-openshift-virtualization.d/81-rebalance.d/
+# Di 9. Sep 11:51:58 CEST 2025
 
-real	2m36,390s
-user	0m0,094s
-sys	0m0,079s
+real	2m4,101s
+user	0m0,119s
+sys	0m0,106s
 $
-```
-
-A JSON report is available at `results.d/result.json`:
-
-```console
-$ cat results.d/result.json 
-{
-  "apiVersion": "validate.kubevirt.openshift.com/v1alpha1",
-  "kind": "Results",
-  "items": [
-    {
-      "plugin": {
-        "name": "plugin-10-openshift",
-        "image": "quay.io/virt-cluster-validate/plugin-10-openshift:latest"
-      },
-      "check": {
-        "name": "00-installation.d",
-        "displayname": "Installation",
-        "pass": true
-      }
-    },
-
 ```
