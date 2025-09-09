@@ -1,6 +1,9 @@
 #!/usr/bin/bash
 
 LVL=$( echo "${1}" | tr "a-z" "A-Z" )
+
+[[ "$LVL" =~ INFO|WARN|FAIL ]] || echo "Unknown level: '$LVL'"
+
 shift 1
 
 echo "${LVL}: $@" | tee -a $LVL

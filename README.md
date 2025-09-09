@@ -13,6 +13,7 @@ then this tool is validating a clusters virtualization setup.
 * Easy to extend
 * For arbitrary clusters
 * Run with cluster-reader permissions
+* There is no skip - Either the cluster is okay, or not
 
 ## Why not tier1/2?
 

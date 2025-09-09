@@ -50,13 +50,14 @@ run_plugins() {
 }
 
 _display_data() {
+  local OPWD=$PWD
   cd $RESULTSD
   find *.d/*.d/ -type d | sort -h | while read TESTDIR; do
-    TESTDIR=$(realpath -s --relative-to="$RESULTSD" "$TESTDIR")
+    RELTESTDIR=$(realpath -s --relative-to="$OPWD" "$TESTDIR")
     echo $(readlink $TESTDIR/result) $TESTDIR
     HAD_DETAILS=false
     for C in FAIL INFO WARN; do [[ -f $TESTDIR/$C ]] && { sed "s/^/     /" $TESTDIR/$C ; HAD_DETAILS=true ; } ; done
-    $HAD_DETAILS && echo "     See '$TESTDIR/log.txt' for more details"
+    $HAD_DETAILS && echo "     See '$RELTESTDIR/log.txt' for more details"
   done | colorfy
 }
 

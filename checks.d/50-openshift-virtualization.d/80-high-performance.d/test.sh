@@ -4,4 +4,7 @@ virtctl create vm --instancetype cx1.medium --volume-import=type:ds,src:openshif
 oc create -f vm.yaml
 
 oc wait --for=condition=Ready=true -f vm.yaml \
-|| { oc get -o yaml -f vm.yaml; fail_with Scheduling "Unable to schedule high performance VMs. Is the CPU manager enabled?"; }
+|| {
+  oc get -o yaml -f vm.yaml
+  pass_with warn Scheduling "Unable to schedule high performance VMs. Is the CPU manager enabled?"
+}
