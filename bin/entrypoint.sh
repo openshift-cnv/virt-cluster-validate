@@ -1,4 +1,29 @@
 #!/usr/bin/bash
 
+set -e
+
 export PATH=$PATH:/app/bin
-testrunner $@
+
+if [[ -z "$@" ]];
+then
+cat <<EOC
+  podman -r run \
+      --rm \
+      --env WD=/ \
+      --env HOME=/ \
+      --env RESULTSD=/results.d/ \
+      --env NUM_CONCURRENT_TESTS=42 \
+      --env TEST_FITER="\$PLUGIN_FILTER" \
+      --volume \$PWD:/app:ro,z \
+      --volume \$RESULTSD:/results.d:rw,z \
+      --volume \$HOME/.kube:/.kube:ro,z \
+      --volume \$(which oc):/usr/bin/oc:ro,bind,exec,z \
+      --volume \$(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \
+      \$IMAGEURL \
+      testrunner
+EOC
+  exit 0
+else
+  testrunner
+  summarize_results "$RESULTSD"
+fi

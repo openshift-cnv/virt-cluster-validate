@@ -7,7 +7,6 @@ export PATH=$PATH:$PWD
 c() { echo "# $@" ; }
 n() { echo "" ; }
 x() { echo "\$ $@" ; eval "$@" ; }
-colorfy() { sed "s/${1:-err\|fail}/\x1b[1;31m&\x1b[0m/I ; s/${2:-pass}/\x1b[1;32m&\x1b[0m/I ; s/${2:-info\|warn}/\x1b[34m&\x1b[0m/I" ; }
 
 export WD=${WD:-$PWD}
 export RESULTSD=${WD:-$PWD}/results.d/
@@ -16,7 +15,6 @@ main() {
   c "$0 ($(git rev-parse --short HEAD))"
   c "$(date)"
   _gather_data
-  _display_data
   c "$(date)"
 }
 
@@ -25,40 +23,16 @@ _gather_data() {
 }
 
 run_plugins() {
-  local PLUGIN_FILTER="${1:-.*}"
-
   c "Building container image"
 
   podman -r build --quiet -t quay.io/openshift-virtualization/virt-cluster-validate .
 
   c "Starting validation ..."
 
-  podman -r run \
-      --rm \
-      --env WD=/ \
-      --env HOME=/ \
-      --env RESULTSD=/results.d/ \
-      --env NUM_CONCURRENT_TESTS=42 \
-      --env TEST_FITER="$PLUGIN_FILTER" \
-      --volume $PWD:/app:ro,z \
-      --volume $RESULTSD:/results.d:rw,z \
-      --volume $HOME/.kube:/.kube:ro,z \
-      --volume $(which oc):/usr/bin/oc:ro,bind,exec,z \
-      --volume $(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \
-      quay.io/openshift-virtualization/virt-cluster-validate \
-      "$TEST_FILTER"
-}
+  IMAGEURL=quay.io/openshift-virtualization/virt-cluster-validate
+  eval $(podman -r run $IMAGEURL)
 
-_display_data() {
-  local OPWD=$PWD
-  cd $RESULTSD
-  find *.d/*.d/ -type d | sort -h | while read TESTDIR; do
-    RELTESTDIR=$(realpath -s --relative-to="$OPWD" "$TESTDIR")
-    echo $(readlink $TESTDIR/result) $TESTDIR
-    HAD_DETAILS=false
-    for C in FAIL INFO WARN; do [[ -f $TESTDIR/$C ]] && { sed "s/^/     /" $TESTDIR/$C ; HAD_DETAILS=true ; } ; done
-    $HAD_DETAILS && echo "     See '$RELTESTDIR/log.txt' for more details"
-  done | colorfy
+  eval $CMD_TO_RUN
 }
 
 _display_data_json() {

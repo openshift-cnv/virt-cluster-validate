@@ -1,0 +1,5 @@
+#!/usr/bin/bash
+
+set -e
+
+sed "s/${1:-err\|fail}/\x1b[1;31m&\x1b[0m/I ; s/${2:-pass}/\x1b[1;32m&\x1b[0m/I ; s/${2:-info\|warn}/\x1b[34m&\x1b[0m/I"
