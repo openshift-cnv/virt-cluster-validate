@@ -1,4 +1,4 @@
 #!/usr/bin/bash
 
-echo "FAIL: $@"
+echo "FAIL: $@" | tee FAIL
 exit 1

@@ -1,0 +1,9 @@
+#!/usr/bin/bash
+
+set -e
+
+TESTFILE="$1"
+
+pushd $(dirname $TESTFILE)
+bash -ex $TESTFILE
+touch PASS

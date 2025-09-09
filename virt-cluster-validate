@@ -18,12 +18,12 @@ export RESULTSD=${WD:-$PWD}/results.d/
 
 main() {
   _gather_data
-  _display_data
+  #_display_data
 }
 
 _gather_data() {
   c "Starting validation ..."
-  [[ -f "${RESULTSD}/result.json" ]] || run_plugins $@
+  run_plugins $@
 }
 
 run_plugins() {
@@ -37,7 +37,7 @@ run_plugins() {
       --env NUM_CONCURRENT_TESTS=10 \
       --env TEST_FITER="$PLUGIN_FILTER" \
       --volume $PWD:/app:ro,z \
-      --volume $PWD/results.d:/app/results.d:rw,z \
+      --volume $PWD/results.d:/results.d:rw,z \
       --volume $HOME/.kube:/.kube:ro,z \
       --volume $(which oc):/usr/bin/oc:ro,bind,exec,z \
       --volume $(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \

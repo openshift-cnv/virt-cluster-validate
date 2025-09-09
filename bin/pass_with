@@ -3,4 +3,4 @@
 LVL=$( echo "${1}" | tr "a-z" "A-Z" )
 shift 1
 
-echo "${LVL}: $@"
+echo "${LVL}: $@" | tee -a $LVL
