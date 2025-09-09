@@ -1,35 +1,23 @@
 #!/usr/bin/bash
 
-source ../lib.sh
+oc get storageprofiles -o json > storageprofiles.json || fail_with Basic "No storageclasses found."
 
-export CHECK_DISPLAYNAME="Storage profiles"
+# No claimPropertySets, impact: User has ot specify acces and vol mode
+cat storageprofiles.json \
+| jq -e '[ .items[] | select(.status | has("claimPropertySets") | not) | .metadata.name] | length == 0' \
+|| pass_with info Known "Some storage classes are not covered by storage profiles"
 
-run() {
-  oc get storageprofiles -o json > storageprofiles.json || fail_with Basic "No storageclasses found."
+# Clone strategy 'copy', impact: Slow clone
+cat storageprofiles.json \
+| jq -e '[ .items[] | select(.status.cloneStrategy == "copy") | .metadata.name] | length == 0' \
+|| pass_with info Clone "Some storage classes only support dumb cloning, leading to slow cloning and potentially slow VM launch times"
 
-  # No claimPropertySets, impact: User has ot specify acces and vol mode
-  cat storageprofiles.json \
-  | jq -e '[ .items[] | select(.status | has("claimPropertySets") | not) | .metadata.name] | length == 0' \
-  || pass_with_info Known "Some storage classes are not covered by storage profiles"
+cat storageprofiles.json \
+| jq -e '[ .items[] | .status.claimPropertySets[]?.accessModes ] | unique | flatten | index ("ReadWriteMany")' \
+|| pass_with_warn ReadWriteMany "There is no storageclass supporting ReadWriteMany, Live Migraiton will not be possible."
 
-  # Clone strategy 'copy', impact: Slow clone
-  cat storageprofiles.json \
-  | jq -e '[ .items[] | select(.status.cloneStrategy == "copy") | .metadata.name] | length == 0' \
-  || pass_with_info Clone "Some storage classes only support dumb cloning, leading to slow cloning and potentially slow VM launch times"
+cat storageprofiles.json \
+| jq -e '[ .items[] | .status.claimPropertySets[]?.volumeMode ] | unique | flatten | index ("Block")' \
+|| pass_with info ReadWriteMany "There is now storageclass supporting Block mode, this can lead to lower performance."
 
-  cat storageprofiles.json \
-  | jq -e '[ .items[] | .status.claimPropertySets[]?.accessModes ] | unique | flatten | index ("ReadWriteMany")' \
-  || pass_with_warn ReadWriteMany "There is no storageclass supporting ReadWriteMany, Live Migraiton will not be possible."
-
-  cat storageprofiles.json \
-  | jq -e '[ .items[] | .status.claimPropertySets[]?.volumeMode ] | unique | flatten | index ("Block")' \
-  || pass_with_info ReadWriteMany "There is now storageclass supporting Block mode, this can lead to lower performance."
-
-  #jq '[ .items[] | select(.status | has("cloneStrategy") | not) | .metadata.name] | length'
-}
-
-cleanup() {
-  :
-}
-
-${@:-main}
+#jq '[ .items[] | select(.status | has("cloneStrategy") | not) | .metadata.name] | length'

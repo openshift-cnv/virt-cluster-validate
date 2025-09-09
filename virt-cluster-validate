@@ -26,6 +26,25 @@ _gather_data() {
   [[ -f "${RESULTSD}/result.json" ]] || run_plugins $@
 }
 
+run_plugins() {
+  local PLUGIN_FILTER="${1:-.*}"
+
+  podman -r run \
+      --rm \
+      --env WD=/ \
+      --env HOME=/ \
+      --env RESULTSD=/results.d/ \
+      --env NUM_CONCURRENT_TESTS=10 \
+      --env TEST_FITER="$PLUGIN_FILTER" \
+      --volume $PWD:/app:ro,z \
+      --volume $PWD/results.d:/app/results.d:rw,z \
+      --volume $HOME/.kube:/.kube:ro,z \
+      --volume $(which oc):/usr/bin/oc:ro,bind,exec,z \
+      --volume $(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \
+      fedora:latest \
+      bash -e -c 'export PATH=$PATH:/app/bin ; prepare ; testrunner "$TEST_FILTER"'
+}
+
 _display_data() {
   c "Summarizing results from '$RESULTSD'"
   cat ${RESULTSD}/*/result.json \
@@ -33,41 +52,6 @@ _display_data() {
   | jq '{apiVersion: "validate.virtualization.openshift.com/v1alpha1", kind: "Results", items: .}' \
   | tee ${RESULTSD}/result.json \
   | pprint
-}
-
-run_plugins() {
-  local PLUGIN_FILTER="${1:-.*}"
-  local PLUGINS=$(grep -E "$PLUGIN_FILTER" $BUILT_PLUGINS_INDEX | sort)
-
-  c "Waiting for jobs to complete" 
-
-  echo -e "$PLUGINS" | xargs -n 1 -P 10 -- $0 run_plugin
-
-  c "All jobs completed."
-}
-
-run_plugin() {
-  local PLUGIN="$1"
-  local PLUGIN_RESULTS="$RESULTSD/$(echo $PLUGIN | tr "/:.-" "____").d/"
-
-  c "Dispatching '$PLUGIN' ..."
-
-  mkdir -p $PLUGIN_RESULTS
-  pushd $PLUGIN_RESULTS
-
-  (
-  podman -r run \
-      --rm \
-      --env WD=/ \
-      --env RESULTSD=/results.d/ \
-      --volume $PLUGIN_RESULTS:/results.d:rw,z \
-      --volume $HOME/.kube:/.kube:ro,z \
-      --volume $(which oc):/usr/bin/oc:ro,bind,exec,z \
-      --volume $(which virtctl):/usr/bin/virtctl:ro,bind,exec,z \
-      $PLUGIN
-  ) > $PLUGIN_RESULTS/cmdline 2>&1
-
-  # fixme we can not trust plugins thus we should generate metadata, hower simpler to do from within plugin
 }
 
 pprint() {
