@@ -52,6 +52,7 @@ run_plugins() {
 _display_data() {
   cd $RESULTSD
   find *.d/*.d/ -type d | sort -h | while read TESTDIR; do
+    TESTDIR=$(realpath -s --relative-to="$RESULTSD" "$TESTDIR")
     echo $(readlink $TESTDIR/result) $TESTDIR
     HAD_DETAILS=false
     for C in FAIL INFO WARN; do [[ -f $TESTDIR/$C ]] && { sed "s/^/     /" $TESTDIR/$C ; HAD_DETAILS=true ; } ; done

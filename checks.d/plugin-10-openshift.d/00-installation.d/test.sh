@@ -1,6 +1,8 @@
 #!/usr/bin/bash
 
 step Connectivity
+oc whoami
+oc whoami --show-server
 oc get project || fail_with "Unable to retrieve projects from cluster"
 
 step Availability
