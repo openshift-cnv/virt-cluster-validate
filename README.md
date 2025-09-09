@@ -53,70 +53,45 @@ $ oc project my-test-project  # Switch to the project where the testing can be p
 
 $ rm -rf results.d/*  # Cleanup any previous results
 $ virt-cluster-validate
-# virt-cluster-validate (3d47616)
-# Di 9. Sep 11:49:53 CEST 2025
+# virt-cluster-validate (50e8c09)
+# Di 9. Sep 12:15:07 CEST 2025
 # Building container image
-61534bf9f0d8a71cd17d0026fab19346cd472bda4648069ef65eada98e8b1872
+b94497c4cf55bae961166a86dc7ac910dbe7ee02d8a56c56164f775f301f5ba5
 # Starting validation ...
-Running './plugin-10-openshift.d/00-installation.d/test.sh'
-Running './plugin-10-openshift.d/10-nodes.d/test.sh'
-Running './plugin-10-openshift.d/11-host-network.d/test.sh'
-Running './plugin-10-openshift.d/30-monitoring.d/test.sh'
-Running './plugin-10-openshift.d/40-storageclasses.d/test.sh'
-Running './plugin-50-openshift-virtualization.d/00-installation.d/test.sh'
-Running './plugin-50-openshift-virtualization.d/10-quota.d/test.sh'
-Running './plugin-50-openshift-virtualization.d/20-bare-metal.d/test.sh'
-Running './plugin-50-openshift-virtualization.d/40-storageprofiles.d/test.sh'
-Running './plugin-50-openshift-virtualization.d/45-network.d/test.sh'
-Running './plugin-50-openshift-virtualization.d/50-snapshots.d/test.sh'
-Running './plugin-50-openshift-virtualization.d/70-live-migration.d/test.sh'
-Running './plugin-50-openshift-virtualization.d/80-high-performance.d/test.sh'
-Running './plugin-50-openshift-virtualization.d/81-rebalance.d/test.sh'
-Completed './plugin-50-openshift-virtualization.d/81-rebalance.d/test.sh'
-Completed './plugin-10-openshift.d/11-host-network.d/test.sh'
-Completed './plugin-10-openshift.d/30-monitoring.d/test.sh'
-Completed './plugin-50-openshift-virtualization.d/20-bare-metal.d/test.sh'
-Completed './plugin-50-openshift-virtualization.d/10-quota.d/test.sh'
-Completed './plugin-10-openshift.d/40-storageclasses.d/test.sh'
-Completed './plugin-50-openshift-virtualization.d/40-storageprofiles.d/test.sh'
-Completed './plugin-50-openshift-virtualization.d/00-installation.d/test.sh'
-Completed './plugin-50-openshift-virtualization.d/45-network.d/test.sh'
-Completed './plugin-10-openshift.d/00-installation.d/test.sh'
-Completed './plugin-10-openshift.d/10-nodes.d/test.sh'
-PASS plugin-10-openshift.d/00-installation.d/
-PASS plugin-10-openshift.d/10-nodes.d/
+Running './10-openshift.d/00-installation.d/test.sh'
+…
+Completed './50-openshift-virtualization.d/80-high-performance.d/test.sh'
+PASS 10-openshift.d/00-installation.d/
+PASS 10-openshift.d/10-nodes.d/
      INFO: Topology Looks like a regular cluster.
      INFO: Remediation Node remediation is provided by MachineHealthChecks
-     See './plugin-10-openshift.d/10-nodes.d//log.txt' for more details
-PASS plugin-10-openshift.d/11-host-network.d/
-PASS plugin-10-openshift.d/30-monitoring.d/
-PASS plugin-10-openshift.d/40-storageclasses.d/
-PASS plugin-50-openshift-virtualization.d/00-installation.d/
-PASS plugin-50-openshift-virtualization.d/10-quota.d/
+     See 'results.d/10-openshift.d/10-nodes.d/log.txt' for more details
+PASS 10-openshift.d/11-host-network.d/
+PASS 10-openshift.d/30-monitoring.d/
+PASS 10-openshift.d/40-storageclasses.d/
+PASS 50-openshift-virtualization.d/00-installation.d/
+PASS 50-openshift-virtualization.d/10-quota.d/
      WARN: Basic There is a quota set on the namespace, this can break this validation. Please remove the quota if any test fails, and retry.
-     See './plugin-50-openshift-virtualization.d/10-quota.d//log.txt' for more details
-PASS plugin-50-openshift-virtualization.d/20-bare-metal.d/
+     See 'results.d/50-openshift-virtualization.d/10-quota.d/log.txt' for more details
+PASS 50-openshift-virtualization.d/20-bare-metal.d/
      INFO: Infrastructure Platform 'BareMetal'
-     See './plugin-50-openshift-virtualization.d/20-bare-metal.d//log.txt' for more details
-PASS plugin-50-openshift-virtualization.d/40-storageprofiles.d/
-     INFO: Known Some storage classes are not covered by storage profiles
+     See 'results.d/50-openshift-virtualization.d/20-bare-metal.d/log.txt' for more details
+PASS 50-openshift-virtualization.d/40-storageprofiles.d/
      INFO: Clone Some storage classes only support dumb cloning, leading to slow cloning and potentially slow VM launch times
-     See './plugin-50-openshift-virtualization.d/40-storageprofiles.d//log.txt' for more details
-PASS plugin-50-openshift-virtualization.d/45-network.d/
-FAIL plugin-50-openshift-virtualization.d/50-snapshots.d/
-     FAIL: Create Failed to create snapshot with default storageclass
-     See './plugin-50-openshift-virtualization.d/50-snapshots.d//log.txt' for more details
-FAIL plugin-50-openshift-virtualization.d/70-live-migration.d/
-     FAIL: Scheduling Unable to schedule VMs?
-     See './plugin-50-openshift-virtualization.d/70-live-migration.d//log.txt' for more details
-FAIL plugin-50-openshift-virtualization.d/80-high-performance.d/
-     FAIL: Scheduling Unable to schedule high performance VMs. Is the CPU manager enabled?
-     See './plugin-50-openshift-virtualization.d/80-high-performance.d//log.txt' for more details
-PASS plugin-50-openshift-virtualization.d/81-rebalance.d/
-# Di 9. Sep 11:51:58 CEST 2025
+     See 'results.d/50-openshift-virtualization.d/40-storageprofiles.d/log.txt' for more details
+PASS 50-openshift-virtualization.d/45-network.d/
+PASS 50-openshift-virtualization.d/50-snapshots.d/
+PASS 50-openshift-virtualization.d/70-live-migration.d/
+     INFO: No permission to perform live migration. This is ok since 4.19+
+     See 'results.d/50-openshift-virtualization.d/70-live-migration.d/log.txt' for more details
+PASS 50-openshift-virtualization.d/80-high-performance.d/
+     WARN: Scheduling Unable to schedule high performance VMs. Is the CPU manager enabled?
+     See 'results.d/50-openshift-virtualization.d/80-high-performance.d/log.txt' for more details
+PASS 50-openshift-virtualization.d/81-rebalance.d/
+# Di 9. Sep 12:15:41 CEST 2025
 
-real	2m4,101s
-user	0m0,119s
-sys	0m0,106s
+real	0m33,055s
+user	0m0,128s
+sys	0m0,113s
 $
 ```
