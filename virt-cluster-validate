@@ -56,7 +56,7 @@ _display_data() {
     echo $(readlink $TESTDIR/result) $TESTDIR
     HAD_DETAILS=false
     for C in FAIL INFO WARN; do [[ -f $TESTDIR/$C ]] && { sed "s/^/     /" $TESTDIR/$C ; HAD_DETAILS=true ; } ; done
-    $HAD_DETAILS && echo "     See '$RESULTSD/$TESTDIR/log.txt' for more details"
+    $HAD_DETAILS && echo "     See '$TESTDIR/log.txt' for more details"
   done | colorfy
 }
 
