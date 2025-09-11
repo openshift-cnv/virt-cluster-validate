@@ -18,6 +18,9 @@ find *.d/*.d/ -type d | sort -h | while read TESTDIR; do
     [[ -f $TESTDIR/$C ]] && { sed "s/^/     /" $TESTDIR/$C ; HAD_DETAILS=true ; } ;
   done
 
-  $HAD_DETAILS && echo "     See '$RELTESTDIR/log.txt' for more details"
+  if $HAD_DETAILS;
+  then
+    echo "     See the files in '$RELTESTDIR' for more details. Specifically log.txt, also encoded below"
+    #echo "     $ ( base64 <<<$(xz < $TESTDIR/log.txt | base64 -w0) ) | xzcat"
+  fi
 done | colorfy
-
