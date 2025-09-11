@@ -10,5 +10,3 @@ find . -name test.sh \
   | grep -E "${FILTER_ON:-.*}" \
   | sort -h \
   | xargs -n 1 -P ${NUM_CONCURRENT_TESTS:-1} -- test_sandbox
-
-summarize_results

@@ -21,6 +21,6 @@ find *.d/*.d/ -type d | sort -h | while read TESTDIR; do
   if $HAD_DETAILS;
   then
     echo "     See the files in '$RELTESTDIR' for more details. Specifically log.txt, also encoded below"
-    #echo "     $ ( base64 <<<$(xz < $TESTDIR/log.txt | base64 -w0) ) | xzcat"
+    #echo "     $ tar tf results.tar $TESTDIR/log.txt --to-stdout"
   fi
 done | colorfy
