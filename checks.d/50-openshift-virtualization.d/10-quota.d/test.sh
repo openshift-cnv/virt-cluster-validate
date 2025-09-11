@@ -1,4 +1,4 @@
 #!/usr/bin/bash
 
-oc get quota | wc -l | test $(cat /dev/stdin) -eq 1 \
-|| pass_with warn Basic "There is a quota set on the namespace, this can break this validation. Please remove the quota if any test fails, and retry."
+[[ "$(oc get quota -o name | wc -l)" -eq 0 ]] \
+|| pass_with warn "There is a quota set on the namespace, this can break this validation. Please remove the quota if any test fails, and retry."
