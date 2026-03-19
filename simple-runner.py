@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, json, subprocess
+import os, sys, json, subprocess, argparse
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -24,6 +24,15 @@ def run_test(test_file, env):
     }
 
 def main():
+    parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
+    parser.add_argument(
+        "-o", "--output", 
+        choices=["json", "human"], 
+        default="human", 
+        help="Output format (default: human)"
+    )
+    args = parser.parse_args()
+
     # Setup PATH to include the local 'bin' folder
     bin_path = os.path.abspath("bin")
     env = {**os.environ, "PATH": f"{bin_path}{os.pathsep}{os.environ.get('PATH', '')}"}
@@ -45,12 +54,30 @@ def main():
     
     summary_text = f"Passed: {passed_count}, Failed: {failed_count}, Total: {total_count}"
     
-    output_data = {
-        "summary": summary_text,
-        "results": results
-    }
+    if args.output == "human":
+        GREEN = '\033[0;32m'
+        RED = '\033[0;31m'
+        NC = '\033[0m'
+        
+        for r in results:
+            if r["success"]:
+                status = f"{GREEN}PASS{NC}"
+            else:
+                status = f"{RED}FAIL{NC}"
+            
+            # Print the one-line status per testcase
+            print(f"[{status}] {r['testpath']}")
+            
+        print("-" * 40)
+        print(summary_text)
     
-    print(json.dumps(output_data, indent=2))
+    elif args.output == "json":
+        output_data = {
+            "summary": summary_text,
+            "results": results
+        }
+        print(json.dumps(output_data, indent=2))
+        
     sys.exit(1 if failed_count > 0 else 0)
 
 if __name__ == "__main__":
