@@ -128,6 +128,7 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180):
     return {
         "testpath": str(test_file),
         "success": success,
+        "cancelled": timed_out[0],
         "duration": duration,
         "report_messages": report_messages,
         "log": log_lines,
@@ -140,7 +141,11 @@ def execute_task(test_file, env, ui, stream_output, timeout_secs):
     ui.update_test(str(test_file), "[    ]")
     result = run_test(test_file, env, stream_output, timeout_secs)
     
-    status_str = f"[{Colors.GREEN}PASS{Colors.NC}]" if result["success"] else f"[{Colors.RED}FAIL{Colors.NC}]"
+    if result.get("cancelled"):
+        status_str = "[----]"
+    else:
+        status_str = f"[{Colors.GREEN}PASS{Colors.NC}]" if result["success"] else f"[{Colors.RED}FAIL{Colors.NC}]"
+    
     ui.update_test(str(test_file), status_str, format_time(result["duration"]))
     
     return result
@@ -152,15 +157,24 @@ def print_details(results, verbose, skip_log_print=False):
 
     print(f"\n{'='*20} DETAILS {'='*20}")
     for r in results:
+        # We always want to show details if it failed or if verbose is true
         if not r["success"] or r["report_messages"] or verbose:
-            color = Colors.GREEN if r["success"] else Colors.RED
-            print(f"\n[{color}{'PASS' if r['success'] else 'FAIL'}{Colors.NC}] {format_time(r['duration'])} {r['testpath']}")
+            if r.get("cancelled"):
+                status_block = "[----]"
+            else:
+                color = Colors.GREEN if r["success"] else Colors.RED
+                status_text = "PASS" if r["success"] else "FAIL"
+                status_block = f"[{color}{status_text}{Colors.NC}]"
             
+            print(f"\n{status_block} {format_time(r['duration'])} {r['testpath']}")
+            
+            # Print specific pass_with / fail_with messages
             for msg in r["report_messages"]:
                 c = Colors.RED if msg.startswith("FAIL:") else ""
                 print(f"    {c}-> {msg}{Colors.NC if c else ''}")
                 
-            if r["log"] and (not r["success"] or verbose) and not skip_log_print:
+            # Print the log output, UNLESS it was cancelled
+            if r["log"] and not r.get("cancelled") and (not r["success"] or verbose) and not skip_log_print:
                 print("    --- Test Output ---")
                 for line in r["log"]: print(f"    {line}")
 
@@ -194,7 +208,7 @@ def main():
     # 3. Execution
     workers = int(os.environ.get("NUM_CONCURRENT_TESTS", os.cpu_count() or 4))
     results = []
-    failed_count = 0
+    failed_count_live = 0
     start_time = time.monotonic()
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -208,10 +222,10 @@ def main():
                 if not f.cancelled():
                     r = f.result()
                     results.append(r)
-                    if not r["success"]: failed_count += 1
+                    if not r["success"]: failed_count_live += 1
 
             # Fail-Fast Trigger
-            if args.fail_fast and failed_count >= args.fail_fast:
+            if args.fail_fast and failed_count_live >= args.fail_fast:
                 for p in pending: p.cancel()
 
             ui.update_progress(len(results), time.monotonic() - start_time)
@@ -228,10 +242,14 @@ def main():
     
     # Unified Summary Calculation
     passed = sum(1 for r in results if r["success"])
-    failed = len(results) - passed
+    cancelled = sum(1 for r in results if r.get("cancelled"))
+    failed = len(results) - passed - cancelled
     skipped = len(test_files) - len(results)
     
-    summary = f"Passed: {passed}, Failed: {failed}" + (f", Skipped: {skipped}" if skipped else "") + f", Total: {len(test_files)}"
+    summary = f"Passed: {passed}, Failed: {failed}"
+    if cancelled > 0: summary += f", Cancelled: {cancelled}"
+    if skipped > 0: summary += f", Skipped: {skipped}"
+    summary += f", Total: {len(test_files)}"
     
     if args.output == "human":
         print_details(results, args.verbose, skip_log_print=stream_output)
