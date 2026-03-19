@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, json, argparse, tempfile, time, threading, subprocess, signal
+import os, sys, json, argparse, tempfile, time, threading, subprocess, signal, random
 from datetime import datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -59,8 +59,54 @@ class TerminalUI:
         with self.lock:
             print("\r\033[K", end="", flush=True)
 
-def run_test(test_file, env, stream_output=False, timeout_secs=180):
+def run_test(test_file, env, stream_output=False, timeout_secs=180, mock=False):
     """Executes a single test script in an isolated temporary directory with a timeout."""
+    
+    if mock:
+        sleep_time = random.uniform(0.5, 6.0)
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        
+        # Simulate a timeout if the randomly generated sleep time is longer than the actual timeout
+        if sleep_time > timeout_secs:
+            time.sleep(timeout_secs)
+            log_lines = [f"[{ts}] TIMEOUT: Test exceeded {timeout_secs} seconds and was killed."]
+            if stream_output:
+                print(log_lines[0])
+            return {
+                "testpath": str(test_file),
+                "success": False,
+                "cancelled": True,
+                "duration": timeout_secs,
+                "report_messages": [],
+                "log": log_lines,
+                "errors": log_lines,
+                "warnings": []
+            }
+            
+        time.sleep(sleep_time)
+        # Randomize success, but heavily bias toward PASS for a more realistic dashboard
+        success = random.choice([True, True, True, False]) 
+        
+        log_lines = [f"[{ts}] Executing simulated test..."]
+        if stream_output:
+            print(log_lines[0])
+            
+        if success:
+            report_messages = [f"INFO: Successfully simulated execution of {test_file.name}"]
+        else:
+            report_messages = [f"FAIL: Simulated failure occurred in {test_file.name}"]
+            
+        return {
+            "testpath": str(test_file),
+            "success": success,
+            "cancelled": False,
+            "duration": sleep_time,
+            "report_messages": report_messages,
+            "log": log_lines,
+            "errors": log_lines if not success else [],
+            "warnings": []
+        }
+
     test_env = env.copy()
     
     with tempfile.TemporaryDirectory(prefix="virt_validate_") as temp_dir:
@@ -136,10 +182,10 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180):
         "warnings": [line for line in log_lines if "warn" in line.lower()]
     }
 
-def execute_task(test_file, env, ui, stream_output, timeout_secs):
+def execute_task(test_file, env, ui, stream_output, timeout_secs, mock):
     """Wrapper that updates the terminal status before and after execution."""
     ui.update_test(str(test_file), "[    ]")
-    result = run_test(test_file, env, stream_output, timeout_secs)
+    result = run_test(test_file, env, stream_output, timeout_secs, mock)
     
     if result.get("cancelled"):
         status_str = "[----]"
@@ -185,6 +231,7 @@ def main():
     parser.add_argument("-f", "--fail-fast", nargs="?", const=1, type=int, metavar="N", help="Stop execution after N failures")
     parser.add_argument("-s", "--select", metavar="PATH", help="Only run the specific test file provided (e.g. checks.d/10-openshift.d/10-nodes.d/test.sh)")
     parser.add_argument("-t", "--timeout", type=parse_timespan, default="180", metavar="SPAN", help="Timeout for each test (e.g. 3m, 45s, 180; default: 180)")
+    parser.add_argument("--mock", action="store_true", help="Simulate execution without cluster interaction (random runtimes up to 6s, random pass/fail)")
     args = parser.parse_args()
 
     # 1. Environment & Discovery
@@ -212,7 +259,7 @@ def main():
     start_time = time.monotonic()
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {executor.submit(execute_task, t, env, ui, stream_output, args.timeout): t for t in test_files}
+        futures = {executor.submit(execute_task, t, env, ui, stream_output, args.timeout, args.mock): t for t in test_files}
         pending = set(futures.keys())
         
         while pending:
