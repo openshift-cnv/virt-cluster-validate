@@ -31,6 +31,9 @@ Validates an OpenShift cluster's virtualization readiness.
 # Fail fast (Stop after 1 failure)
 ./virt-cluster-validate -f
 
+# Simulate execution (UI testing)
+./virt-cluster-validate --mock -t 3s
+
 # Identify slowest tests
 ./virt-cluster-validate --help
 ```
@@ -39,7 +42,10 @@ Validates an OpenShift cluster's virtualization readiness.
 
 *   `-o {human,json}`: Output format (Default: `human`).
 *   `-v, --verbose`: Print full bash logs for every test.
+*   `-s, --select PATH`: Run only a specific test script.
+*   `-t, --timeout SPAN`: Max execution time per test (e.g. `2m`, `45s`, `180`. Default: `180`).
 *   `-f [N], --fail-fast [N]`: Stop execution after N failures (Default: 1).
+*   `--mock`: Simulate test execution with random success/failures and wait times.
 *   `NUM_CONCURRENT_TESTS=N`: Environment variable to control parallelism.
 
 ## Development & Testing

@@ -123,5 +123,33 @@ class TestVirtClusterValidate(unittest.TestCase):
         self.assertTrue(any("start" in log for log in output["results"][0]["log"]))
         self.assertFalse(any("done" in log for log in output["results"][0]["log"]))
 
+    def test_runner_mock_mode(self):
+        """Test that the runner successfully simulates tests without executing them when --mock is used."""
+        # Create a test script that would normally fail instantly with a syntax error
+        self._create_test("10-syntax-error.d", "!!!this is not bash!!!")
+        
+        # Run with the --mock flag
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "json", "--mock"],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+        
+        output = json.loads(res.stdout)
+        
+        # Ensure the test was discovered and executed
+        self.assertEqual(len(output["results"]), 1)
+        
+        # Since it was mocked, it shouldn't have executed the bad bash script.
+        # Instead, it should have generated a simulated log line.
+        self.assertTrue(any("Executing simulated test" in log for log in output["results"][0]["log"]))
+        
+        # The report_messages should contain our simulated pass/fail messages, unless it simulated a timeout
+        if output["results"][0]["cancelled"]:
+            self.assertTrue(any("TIMEOUT" in log for log in output["results"][0]["log"]))
+        else:
+            self.assertTrue(any("Simulated" in msg for msg in output["results"][0]["report_messages"]))
+
 if __name__ == "__main__":
     unittest.main()

@@ -29,3 +29,6 @@ This skill provides the strict architectural and behavioral guidelines necessary
 
 ### Automated Testing (`tests/`)
 Any modification to the core runner logic (e.g., new CLI flags, concurrency changes) MUST include a corresponding integration test in `tests/test_virt_cluster_validate.py` using the standard `unittest` framework.
+
+### Documentation (`README.md`)
+Whenever adding new features, changing CLI flags, or altering core behavior, you MUST update `README.md` to reflect these changes. Keep explanations extremely short, terse, and update the usage examples.
