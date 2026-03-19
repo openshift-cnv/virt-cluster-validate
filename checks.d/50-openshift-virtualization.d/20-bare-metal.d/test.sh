@@ -7,5 +7,3 @@ case "$INFRA" in
   BareMetal|None) pass_with info Infrastructure "Platform '$INFRA'" ;;
                *) fail_with Infrastructure "Platform '$INFRA' with instance type '$INFRA_INSTANCE_TYPE'. This does not look like it is bare metal." ;;
 esac
-
-node.kubernetes.io/instance-type
