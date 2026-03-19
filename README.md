@@ -46,6 +46,21 @@ Validates an OpenShift cluster's virtualization readiness.
 *   `-c, --concurrency N`: Number of tests to run in parallel (Default: Number of CPU cores).
 *   `-f [N], --fail-fast [N]`: Stop execution after N failures (Default: 1).
 
+## Disconnected Environments (Container)
+
+If you are running in a restricted environment or don't have Python/`oc` installed on your bastion, you can build and run the tool as a container.
+
+1.  **Build the Image:**
+    ```bash
+    podman build -t myregistry.internal/virt-cluster-validate:latest -f Containerfile .
+    ```
+2.  **Push to your Mirror:**
+    ```bash
+    podman push myregistry.internal/virt-cluster-validate:latest
+    ```
+3.  **Run as a Job:**
+    You can deploy this as a Kubernetes `Job` within your cluster. The container already includes the `oc` and `virtctl` binaries. Provide your `KUBECONFIG` if running locally via Podman.
+
 ## Development & Testing
 
 ### Unit Tests

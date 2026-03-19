@@ -1,21 +1,25 @@
-FROM fedora
+FROM registry.access.redhat.com/ubi9/python-311:latest
 
-RUN dnf install -y jq
+USER 0
 
-ENV APP=virt-cluster-validate
+# Install required CLI tools for the validation checks
+RUN curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar -xz -C /usr/local/bin/ oc && \
+    curl -L https://github.com/kubevirt/kubevirt/releases/download/v1.1.1/virtctl-v1.1.1-linux-amd64 -o /usr/local/bin/virtctl && \
+    chmod +x /usr/local/bin/oc /usr/local/bin/virtctl
 
-ENV WD="/app"
-ENV HOME="$WD"
-ENV PATH="$PATH:/app/bin"
+USER 1001
 
-ENV RESULTSD="/results.d"
-ENV NUM_CONCURRENT_TESTS="42"
-ENV SINGLE_TEST_TIMEOUT="5m"
-ENV FILTER_ON=".*"
+WORKDIR /opt/app-root/src
 
-ENV DEFAULT_IMAGE="quay.io/openshift-virtualization/$APP"
+# Copy the core application files
+COPY virt-cluster-validate .
+COPY bin/ bin/
+COPY checks.d/ checks.d/
+COPY README.md .
 
-ENTRYPOINT ["/app/bin/entrypoint.sh"]
+# The runner expects 'bin' to be in the PATH
+ENV PATH="/opt/app-root/src/bin:${PATH}"
 
-RUN mkdir $RESULTSD
-ADD . /app
+# By default, run the validation tool
+ENTRYPOINT ["/opt/app-root/src/virt-cluster-validate"]
+CMD ["-v"]
