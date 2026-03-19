@@ -6,8 +6,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 def run_test(test_file, env):
     """Executes a single test script and returns its results as a dictionary."""
-    print(f"Running test: {test_file.parent}", file=sys.stderr)
-    
     # Run bash -e inside the test's directory with the augmented PATH
     res = subprocess.run(
         ["bash", "-e", test_file.name],
@@ -34,7 +32,6 @@ def main():
     
     # Honor original NUM_CONCURRENT_TESTS env var, default to CPU core count
     workers = int(os.environ.get("NUM_CONCURRENT_TESTS", os.cpu_count() or 4))
-    print(f"Starting test runner with {workers} concurrent workers...", file=sys.stderr)
     
     # Run tests concurrently
     with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -47,7 +44,6 @@ def main():
     passed_count = total_count - failed_count
     
     summary_text = f"Passed: {passed_count}, Failed: {failed_count}, Total: {total_count}"
-    print(f"\n{summary_text}", file=sys.stderr)
     
     output_data = {
         "summary": summary_text,
