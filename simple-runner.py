@@ -28,8 +28,6 @@ def run_test(test_file, env):
             
             start_ts = time.monotonic()
             
-            # Using Popen with stderr=subprocess.STDOUT interleaves stdout and stderr 
-            # into a single stream in the correct chronological order.
             process = subprocess.Popen(
                 ["bash", "-e", test_file.name],
                 cwd=temp_dir,
@@ -41,9 +39,7 @@ def run_test(test_file, env):
             )
             
             log_lines = []
-            # Read line-by-line as the process emits them to append accurate timestamps
             for line in process.stdout:
-                # Add a timestamp with millisecond precision
                 ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
                 log_lines.append(f"[{ts}] {line.rstrip(chr(10))}")
                 
