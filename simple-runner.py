@@ -95,7 +95,7 @@ def main():
     bin_path = os.path.abspath("bin")
     env = {**os.environ, "PATH": f"{bin_path}{os.pathsep}{os.environ.get('PATH', '')}"}
     
-    test_files = sorted(Path("checks.d").rglob("test.sh"))
+    test_files = sorted(Path("checks.d").rglob("test*.sh"))
     total_count = len(test_files)
     if total_count == 0:
         print("No tests found.")
@@ -151,18 +151,24 @@ def main():
     
     if args.output == "human":
         # Print detailed output for failures, informational messages or if verbose is enabled
-        has_details = any(r["report_messages"] for r in results)
+        has_details = any(not r["success"] or r["report_messages"] for r in results)
         if has_details or args.verbose:
             print("\n" + "="*20 + " DETAILS " + "="*20)
             for r in results:
-                if r["report_messages"] or args.verbose:
+                # Always show details if the test failed, or if it had a report_message, or if verbose is on
+                if not r["success"] or r["report_messages"] or args.verbose:
                     status = f"{GREEN}PASS{NC}" if r["success"] else f"{RED}FAIL{NC}"
                     print(f"\n[{status}] {format_time(r['duration'])} {r['testpath']}")
+                    
+                    # Print specific pass_with / fail_with messages
                     for msg in r["report_messages"]:
                         color = RED if msg.startswith("FAIL:") else ""
                         reset = NC if msg.startswith("FAIL:") else ""
                         print(f"    {color}-> {msg}{reset}")
-                    if args.verbose and r["log"]:
+                    
+                    # Print the full standard output log if it failed OR if verbose is on
+                    if r["log"] and (not r["success"] or args.verbose):
+                        print("    --- Test Output ---")
                         for line in r["log"]:
                             print(f"    {line}")
         
