@@ -13,11 +13,14 @@ Validates an OpenShift cluster's virtualization readiness.
 ## Prerequisites
 
 *   `oc` and `virtctl` binaries in your `PATH`.
-*   Active `oc login` to the target cluster.
+*   Active `oc login` to the target cluster (required before execution).
 *   Python 3.x (to run the validator).
 *   [Gemini CLI](https://github.com/google/gemini-cli) (Optional, for AI-assisted development).
 
 ## Usage
+
+    # Login to the cluster
+    oc login ...
 
     # Basic run (Human readable)
     ./virt-cluster-validate
