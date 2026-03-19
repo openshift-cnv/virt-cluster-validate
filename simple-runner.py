@@ -2,6 +2,7 @@
 
 import os, sys, json, subprocess
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 def run_test(test_file, env):
     """Executes a single test script and returns its results as a dictionary."""
@@ -29,8 +30,16 @@ def main():
     bin_path = os.path.abspath("bin")
     env = {**os.environ, "PATH": f"{bin_path}{os.pathsep}{os.environ.get('PATH', '')}"}
     
-    # Discover all tests, run them, and collect results
-    results = [run_test(t, env) for t in sorted(Path("checks.d").rglob("test.sh"))]
+    test_files = sorted(Path("checks.d").rglob("test.sh"))
+    
+    # Honor original NUM_CONCURRENT_TESTS env var, default to CPU core count
+    workers = int(os.environ.get("NUM_CONCURRENT_TESTS", os.cpu_count() or 4))
+    print(f"Starting test runner with {workers} concurrent workers...", file=sys.stderr)
+    
+    # Run tests concurrently
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        # executor.map guarantees the final results list remains in the same sorted order as test_files
+        results = list(executor.map(lambda t: run_test(t, env), test_files))
     
     # Summarize and output
     failed_count = sum(1 for r in results if not r["success"])
