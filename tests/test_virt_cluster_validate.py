@@ -102,5 +102,26 @@ class TestVirtClusterValidate(unittest.TestCase):
         executed_paths = [r["testpath"] for r in output["results"]]
         self.assertTrue(any("10-fail" in p for p in executed_paths))
 
+    def test_runner_timeout(self):
+        """Test that the runner correctly enforces timeouts and kills hung processes."""
+        self._create_test("10-timeout.d", "#!/bin/bash\necho 'start'\nsleep 10\necho 'done'\nexit 0")
+        
+        # Run with timeout=2
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "json", "-t", "2"],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+        
+        self.assertEqual(res.returncode, 1)
+        output = json.loads(res.stdout)
+        
+        self.assertEqual(len(output["results"]), 1)
+        self.assertFalse(output["results"][0]["success"])
+        self.assertTrue(any("TIMEOUT: Test exceeded 2 seconds" in log for log in output["results"][0]["log"]))
+        self.assertTrue(any("start" in log for log in output["results"][0]["log"]))
+        self.assertFalse(any("done" in log for log in output["results"][0]["log"]))
+
 if __name__ == "__main__":
     unittest.main()

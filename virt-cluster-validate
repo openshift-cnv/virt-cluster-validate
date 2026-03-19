@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, json, argparse, tempfile, time, threading, subprocess
+import os, sys, json, argparse, tempfile, time, threading, subprocess, signal
 from datetime import datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -48,8 +48,8 @@ class TerminalUI:
         with self.lock:
             print("\r\033[K", end="", flush=True)
 
-def run_test(test_file, env, stream_output=False):
-    """Executes a single test script in an isolated temporary directory."""
+def run_test(test_file, env, stream_output=False, timeout_secs=180):
+    """Executes a single test script in an isolated temporary directory with a timeout."""
     test_env = env.copy()
     
     with tempfile.TemporaryDirectory(prefix="virt_validate_") as temp_dir:
@@ -66,41 +66,68 @@ def run_test(test_file, env, stream_output=False):
             test_env["TEST_REPORT_FD"] = str(fd)
             
             start_ts = time.monotonic()
+            
+            # Start process in a new session so we can kill the entire process group if it times out
             process = subprocess.Popen(
-                ["bash", "-xe", test_file.name],
+                ["bash", "-e", test_file.name],
                 cwd=temp_path, env=test_env,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, pass_fds=(fd,)
+                text=True, pass_fds=(fd,),
+                start_new_session=True
             )
             
+            timed_out = [False]
+            def kill_proc():
+                timed_out[0] = True
+                try:
+                    # Kill the entire process group to catch orphaned sleeps/oc commands
+                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                except Exception:
+                    pass
+                    
+            timer = threading.Timer(timeout_secs, kill_proc)
+            timer.start()
+            
             log_lines = []
-            # Iterate process output live for accurate timestamps
-            for line in process.stdout:
-                ts_line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] {line.rstrip()}"
-                log_lines.append(ts_line)
-                if stream_output:
-                    print(ts_line)
+            try:
+                # Iterate process output live for accurate timestamps
+                for line in process.stdout:
+                    ts_line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] {line.rstrip()}"
+                    log_lines.append(ts_line)
+                    if stream_output:
+                        print(ts_line)
+            finally:
+                timer.cancel()
             
             process.wait()
             duration = time.monotonic() - start_ts
+            
+            if timed_out[0]:
+                ts_line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] TIMEOUT: Test exceeded {timeout_secs} seconds and was killed."
+                log_lines.append(ts_line)
+                if stream_output:
+                    print(ts_line)
+                success = False
+            else:
+                success = process.returncode == 0
             
             report_f.seek(0)
             report_messages = report_f.read().decode('utf-8').splitlines()
     
     return {
         "testpath": str(test_file),
-        "success": process.returncode == 0,
+        "success": success,
         "duration": duration,
         "report_messages": report_messages,
         "log": log_lines,
-        "errors": log_lines if process.returncode != 0 else [],
+        "errors": log_lines if not success else [],
         "warnings": [line for line in log_lines if "warn" in line.lower()]
     }
 
-def execute_task(test_file, env, ui, stream_output):
+def execute_task(test_file, env, ui, stream_output, timeout_secs):
     """Wrapper that updates the terminal status before and after execution."""
     ui.update_test(str(test_file), "[    ]")
-    result = run_test(test_file, env, stream_output)
+    result = run_test(test_file, env, stream_output, timeout_secs)
     
     status_str = f"[{Colors.GREEN}PASS{Colors.NC}]" if result["success"] else f"[{Colors.RED}FAIL{Colors.NC}]"
     ui.update_test(str(test_file), status_str, format_time(result["duration"]))
@@ -132,6 +159,7 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true", help="Show test output in human-readable mode")
     parser.add_argument("-f", "--fail-fast", nargs="?", const=1, type=int, metavar="N", help="Stop execution after N failures")
     parser.add_argument("-s", "--select", metavar="PATH", help="Only run the specific test file provided (e.g. checks.d/10-openshift.d/10-nodes.d/test.sh)")
+    parser.add_argument("-t", "--timeout", type=int, default=180, metavar="SECONDS", help="Timeout in seconds for each test (default: 180)")
     args = parser.parse_args()
 
     # 1. Environment & Discovery
@@ -147,7 +175,6 @@ def main():
 
     # 2. UI Initialization
     stream_output = bool(args.select and args.verbose and args.output == "human")
-    # Disable the complex Terminal UI if we are in raw streaming mode
     is_tty = args.output == "human" and sys.stdout.isatty() and not stream_output
     
     ui = TerminalUI(test_files, is_tty)
@@ -160,7 +187,7 @@ def main():
     start_time = time.monotonic()
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {executor.submit(execute_task, t, env, ui, stream_output): t for t in test_files}
+        futures = {executor.submit(execute_task, t, env, ui, stream_output, args.timeout): t for t in test_files}
         pending = set(futures.keys())
         
         while pending:
@@ -196,7 +223,6 @@ def main():
     summary = f"Passed: {passed}, Failed: {failed}" + (f", Skipped: {skipped}" if skipped else "") + f", Total: {len(test_files)}"
     
     if args.output == "human":
-        # Do not print the log blob a second time if we already streamed it live
         print_details(results, args.verbose, skip_log_print=stream_output)
         print("-" * 40)
         print(summary)
