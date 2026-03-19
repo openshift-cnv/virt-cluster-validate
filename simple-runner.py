@@ -42,10 +42,19 @@ def main():
         results = list(executor.map(lambda t: run_test(t, env), test_files))
     
     # Summarize and output
+    total_count = len(results)
     failed_count = sum(1 for r in results if not r["success"])
-    print(f"\nSummary: Passed: {len(results) - failed_count}, Failed: {failed_count}", file=sys.stderr)
+    passed_count = total_count - failed_count
     
-    print(json.dumps(results, indent=2))
+    summary_text = f"Passed: {passed_count}, Failed: {failed_count}, Total: {total_count}"
+    print(f"\n{summary_text}", file=sys.stderr)
+    
+    output_data = {
+        "summary": summary_text,
+        "results": results
+    }
+    
+    print(json.dumps(output_data, indent=2))
     sys.exit(1 if failed_count > 0 else 0)
 
 if __name__ == "__main__":
