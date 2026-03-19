@@ -1,9 +1,9 @@
 ---
-name: virt-cluster-validate-skill
-description: Use this skill when working with the virt-cluster-validate project to write, debug, or modify OpenShift Virtualization cluster validation checks or the core Python runner itself.
+name: virt-cluster-validate-developer-skill
+description: Guidelines and core rules for developers contributing to the virt-cluster-validate project. Use when writing new checks, modifying the runner, or adding tests.
 ---
 
-# virt-cluster-validate Skill
+# virt-cluster-validate Developer Skill
 
 This skill provides the strict architectural and behavioral guidelines necessary when contributing to the `virt-cluster-validate` repository.
 
