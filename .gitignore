@@ -1,3 +1,8 @@
 **.swp
 **generated**
 results.d
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
