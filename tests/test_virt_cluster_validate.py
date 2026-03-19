@@ -81,13 +81,9 @@ class TestVirtClusterValidate(unittest.TestCase):
         self._create_test("30-long.d", "#!/bin/bash\nsleep 1\nexit 0")
         self._create_test("40-long.d", "#!/bin/bash\nsleep 1\nexit 0")
         
-        env = os.environ.copy()
-        env["NUM_CONCURRENT_TESTS"] = "1"
-        
         res = subprocess.run(
-            [sys.executable, str(RUNNER_SCRIPT), "-o", "json", "-f", "1"],
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "json", "-f", "1", "-c", "1"],
             cwd=self.workspace,
-            env=env,
             capture_output=True,
             text=True
         )

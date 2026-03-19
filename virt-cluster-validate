@@ -235,6 +235,7 @@ def main():
     parser.add_argument("-f", "--fail-fast", nargs="?", const=1, type=int, metavar="N", help="Stop execution after N failures")
     parser.add_argument("-s", "--select", metavar="PATH", help="Only run the specific test file provided (e.g. checks.d/10-openshift.d/10-nodes.d/test.sh)")
     parser.add_argument("-t", "--timeout", type=parse_timespan, default="180", metavar="SPAN", help="Timeout for each test (e.g. 3m, 45s, 180; default: 180)")
+    parser.add_argument("-c", "--concurrency", type=int, default=os.cpu_count() or 4, metavar="N", help="Number of concurrent tests to run (default: CPU count)")
     parser.add_argument("--mock", action="store_true", help="Simulate execution without cluster interaction (random runtimes up to 6s, random pass/fail)")
     args = parser.parse_args()
 
@@ -257,7 +258,7 @@ def main():
     ui.init_display(test_files)
     
     # 3. Execution
-    workers = int(os.environ.get("NUM_CONCURRENT_TESTS", os.cpu_count() or 4))
+    workers = args.concurrency
     results = []
     failed_count_live = 0
     start_time = time.monotonic()
