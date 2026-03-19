@@ -224,13 +224,13 @@ def print_details(results, verbose, skip_log_print=False):
         # We always want to show details if it failed, has warnings/info messages, or if verbose is true
         if not r["success"] or r["report_messages"] or verbose:
             if r.get("cancelled"):
-                status_block = f"[{Colors.YELLOW}----{Colors.NC}]"
+                status_block = "[----]"
             elif not r["success"]:
-                status_block = f"[{Colors.RED}FAIL{Colors.NC}]"
+                status_block = "[FAIL]"
             elif r.get("has_warnings"):
-                status_block = f"[{Colors.YELLOW}WARN{Colors.NC}]"
+                status_block = "[WARN]"
             else:
-                status_block = f"[{Colors.GREEN}PASS{Colors.NC}]"
+                status_block = "[PASS]"
             
             print(f"\n{status_block} {format_time(r['duration'])} {r['testpath']}")
             
