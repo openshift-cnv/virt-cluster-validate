@@ -202,7 +202,7 @@ def execute_task(test_file, env, ui, stream_output, timeout_secs, mock):
         result = run_test(test_file, env, stream_output, timeout_secs)
     
     if result.get("cancelled"):
-        status_str = "[----]"
+        status_str = f"[{Colors.YELLOW}----{Colors.NC}]"
     elif not result["success"]:
         status_str = f"[{Colors.RED}FAIL{Colors.NC}]"
     elif result.get("has_warnings"):
@@ -224,7 +224,7 @@ def print_details(results, verbose, skip_log_print=False):
         # We always want to show details if it failed, has warnings/info messages, or if verbose is true
         if not r["success"] or r["report_messages"] or verbose:
             if r.get("cancelled"):
-                status_block = "[----]"
+                status_block = f"[{Colors.YELLOW}----{Colors.NC}]"
             elif not r["success"]:
                 status_block = f"[{Colors.RED}FAIL{Colors.NC}]"
             elif r.get("has_warnings"):
