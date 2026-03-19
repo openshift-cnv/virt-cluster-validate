@@ -59,7 +59,16 @@ If you are running in a restricted environment or don't have Python/`oc` install
     podman push myregistry.internal/virt-cluster-validate:latest
     ```
 3.  **Run as a Job:**
-    You can deploy this as a Kubernetes `Job` within your cluster. The container already includes the `oc` and `virtctl` binaries. Provide your `KUBECONFIG` if running locally via Podman.
+    You can deploy this as a Kubernetes `Job` within your cluster. The container already includes the `oc` and `virtctl` binaries.
+
+4.  **Run locally with Podman:**
+    To test the container locally, mount your `KUBECONFIG`:
+    ```bash
+    podman run --rm \
+      -v ${KUBECONFIG:-$HOME/.kube/config}:/opt/app-root/src/.kube/config:z \
+      -e KUBECONFIG=/opt/app-root/src/.kube/config \
+      myregistry.internal/virt-cluster-validate:latest
+    ```
 
 ## Development & Testing
 
