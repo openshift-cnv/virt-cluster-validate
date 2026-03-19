@@ -126,7 +126,7 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180):
             
             # Start process in a new session so we can kill the entire process group if it times out
             process = subprocess.Popen(
-                ["bash", "-e", test_file.name],
+                ["bash", "-xe", test_file.name],
                 cwd=temp_path, env=test_env,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, pass_fds=(fd,),
