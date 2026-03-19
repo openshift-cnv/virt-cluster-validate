@@ -14,7 +14,7 @@ cat storageprofiles.json \
 
 cat storageprofiles.json \
 | jq -e '[ .items[] | .status.claimPropertySets[]?.accessModes ] | unique | flatten | index ("ReadWriteMany")' \
-|| pass_with_warn ReadWriteMany "There is no storageclass supporting ReadWriteMany, Live Migraiton will not be possible."
+|| pass_with warn ReadWriteMany "There is no storageclass supporting ReadWriteMany, Live Migraiton will not be possible."
 
 cat storageprofiles.json \
 | jq -e '[ .items[] | .status.claimPropertySets[]?.volumeMode ] | unique | flatten | index ("Block")' \
