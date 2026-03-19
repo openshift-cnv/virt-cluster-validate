@@ -19,25 +19,23 @@ Validates an OpenShift cluster's virtualization readiness.
 
 ## Usage
 
-```bash
-# Basic run (Human readable)
-./virt-cluster-validate
+    # Basic run (Human readable)
+    ./virt-cluster-validate
 
-# Verbose run (Shows full logs)
-./virt-cluster-validate -v
+    # Verbose run (Shows full logs)
+    ./virt-cluster-validate -v
 
-# JSON output (For automation)
-./virt-cluster-validate -o json
+    # JSON output (For automation)
+    ./virt-cluster-validate -o json
 
-# Fail fast (Stop after 1 failure)
-./virt-cluster-validate -f
+    # Fail fast (Stop after 1 failure)
+    ./virt-cluster-validate -f
 
-# Simulate execution (UI testing)
-./virt-cluster-validate --mock -t 3s
+    # Simulate execution (UI testing)
+    ./virt-cluster-validate --mock -t 3s
 
-# Identify slowest tests
-./virt-cluster-validate --help
-```
+    # Identify slowest tests
+    ./virt-cluster-validate --help
 
 ### CLI Options
 
@@ -52,15 +50,14 @@ Validates an OpenShift cluster's virtualization readiness.
 ## Development & Testing
 
 ### Unit Tests
-```bash
-python3 -m unittest discover -s tests
-```
+
+    python3 -m unittest discover -s tests
 
 ### AI-Assisted Development
+
 This project includes a [Gemini CLI](https://github.com/google/gemini-cli) developer skill to ensure architectural consistency.
 To enable it in your workspace:
-```bash
-gemini skills install .gemini/skills/virt-cluster-validate-developer-skill/ --scope workspace
-```
+
+    gemini skills install .gemini/skills/virt-cluster-validate-developer-skill/ --scope workspace
 
 To add checks, create a new directory in `checks.d/` and add a script matching `test*.sh`. Use `pass_with` and `fail_with` helpers from `bin/`.
