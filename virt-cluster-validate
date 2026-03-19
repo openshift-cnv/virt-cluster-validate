@@ -90,13 +90,20 @@ def simulate_test(test_file, stream_output=False, timeout_secs=180):
         print(log_lines[0])
         
     if success:
-        report_messages = [f"INFO: Successfully simulated execution of {test_file.name}"]
+        if random.random() > 0.8:
+            has_warnings = True
+            report_messages = [f"WARN: Simulated warning in {test_file.name}"]
+        else:
+            has_warnings = False
+            report_messages = [f"INFO: Successfully simulated execution of {test_file.name}"]
     else:
+        has_warnings = False
         report_messages = [f"FAIL: Simulated failure occurred in {test_file.name}"]
         
     return {
         "testpath": str(test_file),
         "success": success,
+        "has_warnings": has_warnings,
         "cancelled": False,
         "duration": sleep_time,
         "report_messages": report_messages,
@@ -171,9 +178,12 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180):
             report_f.seek(0)
             report_messages = report_f.read().decode('utf-8').splitlines()
     
+    has_warnings = any(msg.startswith("WARN:") for msg in report_messages)
+
     return {
         "testpath": str(test_file),
         "success": success,
+        "has_warnings": has_warnings,
         "cancelled": timed_out[0],
         "duration": duration,
         "report_messages": report_messages,
@@ -193,8 +203,12 @@ def execute_task(test_file, env, ui, stream_output, timeout_secs, mock):
     
     if result.get("cancelled"):
         status_str = "[----]"
+    elif not result["success"]:
+        status_str = f"[{Colors.RED}FAIL{Colors.NC}]"
+    elif result.get("has_warnings"):
+        status_str = f"[{Colors.YELLOW}WARN{Colors.NC}]"
     else:
-        status_str = f"[{Colors.GREEN}PASS{Colors.NC}]" if result["success"] else f"[{Colors.RED}FAIL{Colors.NC}]"
+        status_str = f"[{Colors.GREEN}PASS{Colors.NC}]"
     
     ui.update_test(str(test_file), status_str, format_time(result["duration"]))
     
@@ -207,24 +221,31 @@ def print_details(results, verbose, skip_log_print=False):
 
     print(f"\n{'='*20} DETAILS {'='*20}")
     for r in results:
-        # We always want to show details if it failed or if verbose is true
+        # We always want to show details if it failed, has warnings/info messages, or if verbose is true
         if not r["success"] or r["report_messages"] or verbose:
             if r.get("cancelled"):
                 status_block = "[----]"
+            elif not r["success"]:
+                status_block = f"[{Colors.RED}FAIL{Colors.NC}]"
+            elif r.get("has_warnings"):
+                status_block = f"[{Colors.YELLOW}WARN{Colors.NC}]"
             else:
-                color = Colors.GREEN if r["success"] else Colors.RED
-                status_text = "PASS" if r["success"] else "FAIL"
-                status_block = f"[{color}{status_text}{Colors.NC}]"
+                status_block = f"[{Colors.GREEN}PASS{Colors.NC}]"
             
             print(f"\n{status_block} {format_time(r['duration'])} {r['testpath']}")
             
             # Print specific pass_with / fail_with messages
             for msg in r["report_messages"]:
-                c = Colors.RED if msg.startswith("FAIL:") else ""
+                if msg.startswith("FAIL:"):
+                    c = Colors.RED
+                elif msg.startswith("WARN:"):
+                    c = Colors.YELLOW
+                else:
+                    c = ""
                 print(f"    {c}-> {msg}{Colors.NC if c else ''}")
                 
             # Print the log output, UNLESS it was cancelled
-            if r["log"] and not r.get("cancelled") and (not r["success"] or verbose) and not skip_log_print:
+            if r["log"] and not r.get("cancelled") and (not r["success"] or r.get("has_warnings") or verbose) and not skip_log_print:
                 print("    --- Test Output ---")
                 for line in r["log"]: print(f"    {line}")
 
@@ -294,12 +315,15 @@ def main():
     results.sort(key=lambda x: x["testpath"])
     
     # Unified Summary Calculation
-    passed = sum(1 for r in results if r["success"])
+    passed = sum(1 for r in results if r["success"] and not r.get("has_warnings"))
+    warnings = sum(1 for r in results if r["success"] and r.get("has_warnings"))
     cancelled = sum(1 for r in results if r.get("cancelled"))
-    failed = len(results) - passed - cancelled
+    failed = len(results) - passed - warnings - cancelled
     skipped = len(test_files) - len(results)
     
-    summary = f"Passed: {passed}, Failed: {failed}"
+    summary = f"Passed: {passed}"
+    if warnings > 0: summary += f", Warned: {warnings}"
+    summary += f", Failed: {failed}"
     if cancelled > 0: summary += f", Cancelled: {cancelled}"
     if skipped > 0: summary += f", Skipped: {skipped}"
     summary += f", Total: {len(test_files)}"
