@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import os, sys, json, subprocess, argparse, tempfile
+import os, sys, json, subprocess, argparse, tempfile, time
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def run_test(test_file, env):
     """Executes a single test script and returns its results as a dictionary."""
@@ -40,6 +40,11 @@ def run_test(test_file, env):
         "warnings": [line for line in output if "warn" in line.lower()]
     }
 
+def format_time(seconds):
+    """Converts seconds into a MM:SS string."""
+    m, s = divmod(int(seconds), 60)
+    return f"{m:02d}:{s:02d}"
+
 def main():
     parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
     parser.add_argument(
@@ -60,48 +65,92 @@ def main():
     env = {**os.environ, "PATH": f"{bin_path}{os.pathsep}{os.environ.get('PATH', '')}"}
     
     test_files = sorted(Path("checks.d").rglob("test.sh"))
+    total_count = len(test_files)
+    
+    if total_count == 0:
+        print("No tests found.")
+        sys.exit(0)
     
     # Honor original NUM_CONCURRENT_TESTS env var, default to CPU core count
     workers = int(os.environ.get("NUM_CONCURRENT_TESTS", os.cpu_count() or 4))
     
+    GREEN = '\033[0;32m'
+    RED = '\033[0;31m'
+    NC = '\033[0m'
+    
+    results = []
+    completed_count = 0
+    start_time = time.time()
+    
     # Run tests concurrently
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        # executor.map guarantees the final results list remains in the same sorted order as test_files
-        results = list(executor.map(lambda t: run_test(t, env), test_files))
+        # Submit all tasks
+        future_to_test = {executor.submit(run_test, t, env): t for t in test_files}
+        
+        # Process them as they complete to provide real-time feedback
+        for future in as_completed(future_to_test):
+            r = future.result()
+            results.append(r)
+            completed_count += 1
+            
+            # ETA Logic: Based on runtime so far and amount of completed tests
+            # rate = tests_completed / time_elapsed
+            # remaining_time = tests_remaining / rate
+            elapsed_time = time.time() - start_time
+            
+            if completed_count > 0:
+                tests_remaining = total_count - completed_count
+                rate = completed_count / elapsed_time
+                eta_seconds = tests_remaining / rate
+            else:
+                eta_seconds = 0
+
+            if args.output == "human":
+                # Clear the current line (which holds the progress bar)
+                sys.stdout.write("\r\033[K")
+                
+                # Print the result of the completed test
+                status = f"{GREEN}PASS{NC}" if r["success"] else f"{RED}FAIL{NC}"
+                print(f"[{status}] {r['testpath']}")
+                
+                if not r["success"] and r["fail_messages"]:
+                    for msg in r["fail_messages"]:
+                        print(f"    {RED}-> {msg}{NC}")
+                
+                if args.verbose and r["log"]:
+                    for line in r["log"]:
+                        print(f"    {line}")
+                
+                # Redraw the progress bar at the bottom if it's a TTY
+                if sys.stdout.isatty():
+                    prog_percent = int((completed_count / total_count) * 100)
+                    prog_bar_width = 20
+                    filled_len = int(prog_bar_width * completed_count // total_count)
+                    bar = '#' * filled_len + '-' * (prog_bar_width - filled_len)
+                    
+                    prog_str = (
+                        f"Progress: [{bar}] {prog_percent}% ({completed_count}/{total_count}) | "
+                        f"Spent: {format_time(elapsed_time)} | "
+                        f"Remaining: {format_time(eta_seconds)}"
+                    )
+                    sys.stdout.write(prog_str)
+                    sys.stdout.flush()
+
+    # Sort results back to sequential order based on test path for stable output
+    results.sort(key=lambda x: x["testpath"])
     
-    # Summarize and output
-    total_count = len(results)
     failed_count = sum(1 for r in results if not r["success"])
     passed_count = total_count - failed_count
     
     summary_text = f"Passed: {passed_count}, Failed: {failed_count}, Total: {total_count}"
     
     if args.output == "human":
-        GREEN = '\033[0;32m'
-        RED = '\033[0;31m'
-        NC = '\033[0m'
-        
-        for r in results:
-            if r["success"]:
-                status = f"{GREEN}PASS{NC}"
-            else:
-                status = f"{RED}FAIL{NC}"
-            
-            # Print the one-line status per testcase
-            print(f"[{status}] {r['testpath']}")
-            
-            # Print specific failure messages captured directly via the FD
-            if not r["success"] and r["fail_messages"]:
-                for msg in r["fail_messages"]:
-                    print(f"    {RED}-> {msg}{NC}")
-            
-            # If verbose is set, print the full logs indented
-            if args.verbose and r["log"]:
-                for line in r["log"]:
-                    print(f"    {line}")
-            
+        # Clear the final progress bar
+        if sys.stdout.isatty():
+            sys.stdout.write("\r\033[K")
         print("-" * 40)
         print(summary_text)
+        print(f"Total time: {format_time(time.time() - start_time)}")
     
     elif args.output == "json":
         output_data = {
