@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
-import os, sys, json, subprocess, argparse, tempfile, time
+import os, sys, json, subprocess, argparse, tempfile, time, threading
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait
+
+# Global lock to prevent overlapping output when updating specific lines in the terminal
+stdout_lock = threading.Lock()
 
 def run_test(test_file, env):
     """Executes a single test script and returns its results as a dictionary."""
@@ -11,12 +14,9 @@ def run_test(test_file, env):
     with tempfile.TemporaryFile() as fail_f:
         # Get the underlying OS file descriptor
         fd = fail_f.fileno()
-        
-        # Ensure the file descriptor is inheritable by the bash child process
         os.set_inheritable(fd, True)
         test_env["FAIL_FD"] = str(fd)
         
-        # Run bash -e inside the test's directory with the augmented PATH
         res = subprocess.run(
             ["bash", "-e", test_file.name],
             cwd=test_file.parent,
@@ -26,7 +26,6 @@ def run_test(test_file, env):
             pass_fds=(fd,)
         )
         
-        # Seek back to the beginning of the temporary file to read what bash wrote
         fail_f.seek(0)
         fail_messages = fail_f.read().decode('utf-8').splitlines()
     
@@ -40,6 +39,29 @@ def run_test(test_file, env):
         "warnings": [line for line in output if "warn" in line.lower()]
     }
 
+def update_line_status(test_path, status_prefix, test_line_map, total_count):
+    """Uses ANSI escape codes to update the status prefix of a specific test line."""
+    if not sys.stdout.isatty():
+        return
+    line_idx = test_line_map[test_path]
+    # Calculate how many lines up we need to jump from the progress bar
+    lines_up = (total_count - line_idx) + 1
+    with stdout_lock:
+        # Save cursor, move up, overwrite start of line, restore cursor
+        # \033[s and \033[u are not supported by all terminals, so we use relative movement
+        sys.stdout.write(f"\033[{lines_up}A\r{status_prefix}\033[{lines_up}B")
+        sys.stdout.flush()
+
+def run_test_task(test_file, env, test_line_map, total_count, GREEN, RED, NC):
+    """Wrapper for run_test that updates the terminal status before and after execution."""
+    test_path_str = str(test_file)
+    update_line_status(test_path_str, "[RUN ]", test_line_map, total_count)
+    result = run_test(test_file, env)
+    status_color = GREEN if result["success"] else RED
+    status_text = "PASS" if result["success"] else "FAIL"
+    update_line_status(test_path_str, f"[{status_color}{status_text}{NC}]", test_line_map, total_count)
+    return result
+
 def format_time(seconds):
     """Converts seconds into a MM:SS string."""
     m, s = divmod(int(seconds), 60)
@@ -47,117 +69,88 @@ def format_time(seconds):
 
 def main():
     parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
-    parser.add_argument(
-        "-o", "--output", 
-        choices=["json", "human"], 
-        default="human", 
-        help="Output format (default: human)"
-    )
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Show test output in human-readable mode"
-    )
+    parser.add_argument("-o", "--output", choices=["json", "human"], default="human", help="Output format (default: human)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show test output in human-readable mode")
     args = parser.parse_args()
 
-    # Setup PATH to include the local 'bin' folder
     bin_path = os.path.abspath("bin")
     env = {**os.environ, "PATH": f"{bin_path}{os.pathsep}{os.environ.get('PATH', '')}"}
     
     test_files = sorted(Path("checks.d").rglob("test.sh"))
     total_count = len(test_files)
-    
     if total_count == 0:
         print("No tests found.")
         sys.exit(0)
     
-    # Honor original NUM_CONCURRENT_TESTS env var, default to CPU core count
+    test_line_map = {str(t): i for i, t in enumerate(test_files)}
     workers = int(os.environ.get("NUM_CONCURRENT_TESTS", os.cpu_count() or 4))
     
-    GREEN = '\033[0;32m'
-    RED = '\033[0;31m'
-    NC = '\033[0m'
+    GREEN, RED, NC = ('\033[0;32m', '\033[0;31m', '\033[0m')
+    results, completed_count, start_time = ([], 0, time.monotonic())
     
-    results = []
-    completed_count = 0
-    start_time = time.time()
-    
-    # Run tests concurrently
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        # Submit all tasks
-        future_to_test = {executor.submit(run_test, t, env): t for t in test_files}
-        
-        # Process them as they complete to provide real-time feedback
-        for future in as_completed(future_to_test):
-            r = future.result()
-            results.append(r)
-            completed_count += 1
-            
-            # ETA Logic: Based on runtime so far and amount of completed tests
-            # rate = tests_completed / time_elapsed
-            # remaining_time = tests_remaining / rate
-            elapsed_time = time.time() - start_time
-            
-            if completed_count > 0:
-                tests_remaining = total_count - completed_count
-                rate = completed_count / elapsed_time
-                eta_seconds = tests_remaining / rate
-            else:
-                eta_seconds = 0
+    is_human_tty = (args.output == "human" and sys.stdout.isatty())
 
-            if args.output == "human":
-                # Clear the current line (which holds the progress bar)
-                sys.stdout.write("\r\033[K")
+    if is_human_tty:
+        # Pre-print the full list of tests with empty status
+        for t in test_files:
+            print(f"[    ] {t}")
+        print("") # Placeholder for the progress bar
+        sys.stdout.flush()
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(run_test_task, t, env, test_line_map, total_count, GREEN, RED, NC): t for t in test_files}
+        pending = set(futures.keys())
+        
+        while pending:
+            done, pending = wait(pending, timeout=1.0)
+            for f in done:
+                r = f.result()
+                results.append(r)
+                completed_count += 1
+
+            if is_human_tty:
+                elapsed_time = time.monotonic() - start_time
                 
-                # Print the result of the completed test
-                status = f"{GREEN}PASS{NC}" if r["success"] else f"{RED}FAIL{NC}"
-                print(f"[{status}] {r['testpath']}")
+                prog_percent = int((completed_count / total_count) * 100)
+                prog_bar_width = 20
+                filled_len = int(prog_bar_width * completed_count // total_count)
+                bar = '#' * filled_len + '-' * (prog_bar_width - filled_len)
                 
-                if not r["success"] and r["fail_messages"]:
-                    for msg in r["fail_messages"]:
-                        print(f"    {RED}-> {msg}{NC}")
-                
-                if args.verbose and r["log"]:
-                    for line in r["log"]:
-                        print(f"    {line}")
-                
-                # Redraw the progress bar at the bottom if it's a TTY
-                if sys.stdout.isatty():
-                    prog_percent = int((completed_count / total_count) * 100)
-                    prog_bar_width = 20
-                    filled_len = int(prog_bar_width * completed_count // total_count)
-                    bar = '#' * filled_len + '-' * (prog_bar_width - filled_len)
-                    
-                    prog_str = (
-                        f"Progress: [{bar}] {prog_percent}% ({completed_count}/{total_count}) | "
-                        f"Spent: {format_time(elapsed_time)} | "
-                        f"Remaining: {format_time(eta_seconds)}"
-                    )
+                with stdout_lock:
+                    sys.stdout.write("\r\033[K") # Clear progress bar line
+                    prog_str = f"Progress: [{bar}] {prog_percent}% ({completed_count}/{total_count}) | Spent: {format_time(elapsed_time)}"
                     sys.stdout.write(prog_str)
                     sys.stdout.flush()
 
-    # Sort results back to sequential order based on test path for stable output
+    if is_human_tty:
+        sys.stdout.write("\r\033[K") # Final clear of progress bar
+        sys.stdout.flush()
+
     results.sort(key=lambda x: x["testpath"])
-    
     failed_count = sum(1 for r in results if not r["success"])
-    passed_count = total_count - failed_count
-    
-    summary_text = f"Passed: {passed_count}, Failed: {failed_count}, Total: {total_count}"
+    summary_text = f"Passed: {total_count - failed_count}, Failed: {failed_count}, Total: {total_count}"
     
     if args.output == "human":
-        # Clear the final progress bar
-        if sys.stdout.isatty():
-            sys.stdout.write("\r\033[K")
+        # Print detailed output for failures or if verbose is enabled
+        failures = [r for r in results if not r["success"]]
+        if failures or args.verbose:
+            print("\n" + "="*20 + " DETAILS " + "="*20)
+            for r in results:
+                if not r["success"] or args.verbose:
+                    status = f"{GREEN}PASS{NC}" if r["success"] else f"{RED}FAIL{NC}"
+                    print(f"\n[{status}] {r['testpath']}")
+                    for msg in r["fail_messages"]:
+                        print(f"    {RED}-> {msg}{NC}")
+                    if args.verbose and r["log"]:
+                        for line in r["log"]:
+                            print(f"    {line}")
+        
         print("-" * 40)
         print(summary_text)
-        print(f"Total time: {format_time(time.time() - start_time)}")
+        print(f"Total time: {format_time(time.monotonic() - start_time)}")
     
     elif args.output == "json":
-        output_data = {
-            "summary": summary_text,
-            "results": results
-        }
-        print(json.dumps(output_data, indent=2))
+        print(json.dumps({"summary": summary_text, "results": results}, indent=2))
         
     sys.exit(1 if failed_count > 0 else 0)
 
