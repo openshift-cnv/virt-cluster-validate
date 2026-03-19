@@ -32,7 +32,8 @@ class TerminalUI:
         if not self.is_tty: return
         lines_up = (self.total - self.line_map[test_path]) + 1
         with self.lock:
-            print(f"\033[{lines_up}A\r{status} {duration} {test_path}\033[{lines_up}B", end="", flush=True)
+            # Move up, clear line, write status, move back down
+            print(f"\033[{lines_up}A\r\033[K{status} {duration} {test_path}\033[{lines_up}B", end="", flush=True)
 
     def update_progress(self, completed, elapsed):
         if not self.is_tty: return
@@ -74,7 +75,7 @@ def run_test(test_file, env):
             
             # Iterate process output live for accurate timestamps
             log_lines = [
-                f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] {line.rstrip(chr(10))}"
+                f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] {line.rstrip()}"
                 for line in process.stdout
             ]
             
@@ -99,43 +100,29 @@ def execute_task(test_file, env, ui):
     ui.update_test(str(test_file), "[    ]")
     result = run_test(test_file, env)
     
-    color = Colors.GREEN if result["success"] else Colors.RED
-    status = "PASS" if result["success"] else "FAIL"
-    ui.update_test(str(test_file), f"[{color}{status}{Colors.NC}]", format_time(result["duration"]))
+    status_str = f"[{Colors.GREEN}PASS{Colors.NC}]" if result["success"] else f"[{Colors.RED}FAIL{Colors.NC}]"
+    ui.update_test(str(test_file), status_str, format_time(result["duration"]))
     
     return result
 
-def print_summary_and_details(results, test_files, total_time, verbose):
-    """Prints the expanded logs and final summary."""
-    has_details = any(not r["success"] or r["report_messages"] for r in results)
-    
-    if has_details or verbose:
-        print(f"\n{'='*20} DETAILS {'='*20}")
-        for r in results:
-            if not r["success"] or r["report_messages"] or verbose:
-                color = Colors.GREEN if r["success"] else Colors.RED
-                print(f"\n[{color}{'PASS' if r['success'] else 'FAIL'}{Colors.NC}] {format_time(r['duration'])} {r['testpath']}")
-                
-                for msg in r["report_messages"]:
-                    c = Colors.RED if msg.startswith("FAIL:") else ""
-                    print(f"    {c}-> {msg}{Colors.NC if c else ''}")
-                    
-                if r["log"] and (not r["success"] or verbose):
-                    print("    --- Test Output ---")
-                    for line in r["log"]: print(f"    {line}")
+def print_details(results, verbose):
+    """Prints the expanded logs and reports for relevant tests."""
+    if not any(not r["success"] or r["report_messages"] for r in results) and not verbose:
+        return
 
-    passed = sum(1 for r in results if r["success"])
-    failed = len(results) - passed
-    skipped = len(test_files) - len(results)
-    
-    summary = f"Passed: {passed}, Failed: {failed}"
-    if skipped > 0: summary += f", Skipped: {skipped}"
-    summary += f", Total: {len(test_files)}"
-    
-    print("-" * 40)
-    print(summary)
-    print(f"Total time: {format_time(total_time)}")
-    return summary
+    print(f"\n{'='*20} DETAILS {'='*20}")
+    for r in results:
+        if not r["success"] or r["report_messages"] or verbose:
+            color = Colors.GREEN if r["success"] else Colors.RED
+            print(f"\n[{color}{'PASS' if r['success'] else 'FAIL'}{Colors.NC}] {format_time(r['duration'])} {r['testpath']}")
+            
+            for msg in r["report_messages"]:
+                c = Colors.RED if msg.startswith("FAIL:") else ""
+                print(f"    {c}-> {msg}{Colors.NC if c else ''}")
+                
+            if r["log"] and (not r["success"] or verbose):
+                print("    --- Test Output ---")
+                for line in r["log"]: print(f"    {line}")
 
 def main():
     parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
@@ -185,20 +172,25 @@ def main():
     
     # 4. Mark Skipped Tests
     executed_paths = {r["testpath"] for r in results}
-    for t in test_files:
-        if str(t) not in executed_paths:
-            ui.update_test(str(t), f"[{Colors.YELLOW}SKIP{Colors.NC}]")
+    for t in (str(tf) for tf in test_files if str(tf) not in executed_paths):
+        ui.update_test(t, f"[{Colors.YELLOW}SKIP{Colors.NC}]")
 
     # 5. Output Results
     results.sort(key=lambda x: x["testpath"])
     
+    # Unified Summary Calculation
+    passed = sum(1 for r in results if r["success"])
+    failed = len(results) - passed
+    skipped = len(test_files) - len(results)
+    
+    summary = f"Passed: {passed}, Failed: {failed}" + (f", Skipped: {skipped}" if skipped else "") + f", Total: {len(test_files)}"
+    
     if args.output == "human":
-        print_summary_and_details(results, test_files, time.monotonic() - start_time, args.verbose)
+        print_details(results, args.verbose)
+        print("-" * 40)
+        print(summary)
+        print(f"Total time: {format_time(time.monotonic() - start_time)}")
     else:
-        passed = sum(1 for r in results if r["success"])
-        failed = len(results) - passed
-        skipped = len(test_files) - len(results)
-        summary = f"Passed: {passed}, Failed: {failed}" + (f", Skipped: {skipped}" if skipped else "") + f", Total: {len(test_files)}"
         print(json.dumps({"summary": summary, "results": results}, indent=2))
         
     sys.exit(1 if failed_count > 0 else 0)
