@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, json, subprocess, argparse, tempfile, time, threading
+import os, sys, json, subprocess, argparse, tempfile, time, threading, shutil
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -8,28 +8,41 @@ from concurrent.futures import ThreadPoolExecutor, wait
 stdout_lock = threading.Lock()
 
 def run_test(test_file, env):
-    """Executes a single test script and returns its results as a dictionary."""
+    """Executes a single test script in an isolated temporary directory."""
     test_env = env.copy()
     
-    with tempfile.TemporaryFile() as report_f:
-        # Get the underlying OS file descriptor
-        fd = report_f.fileno()
-        os.set_inheritable(fd, True)
-        test_env["TEST_REPORT_FD"] = str(fd)
+    # Create an isolated workspace for this test
+    with tempfile.TemporaryDirectory(prefix="virt_validate_") as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
         
-        start_ts = time.monotonic()
-        res = subprocess.run(
-            ["bash", "-e", test_file.name],
-            cwd=test_file.parent,
-            env=test_env,
-            capture_output=True,
-            text=True,
-            pass_fds=(fd,)
-        )
-        duration = time.monotonic() - start_ts
+        # Symlink all files from the test's original directory into the temp workspace
+        original_dir = test_file.parent
+        for item in original_dir.iterdir():
+            if item.is_file():
+                dest_file = temp_dir / item.name
+                os.symlink(item.absolute(), dest_file)
         
-        report_f.seek(0)
-        report_messages = report_f.read().decode('utf-8').splitlines()
+        with tempfile.TemporaryFile() as report_f:
+            # Get the underlying OS file descriptor
+            fd = report_f.fileno()
+            os.set_inheritable(fd, True)
+            test_env["TEST_REPORT_FD"] = str(fd)
+            
+            start_ts = time.monotonic()
+            
+            # Execute the test script from WITHIN the isolated temporary directory
+            res = subprocess.run(
+                ["bash", "-e", test_file.name],
+                cwd=temp_dir,
+                env=test_env,
+                capture_output=True,
+                text=True,
+                pass_fds=(fd,)
+            )
+            duration = time.monotonic() - start_ts
+            
+            report_f.seek(0)
+            report_messages = report_f.read().decode('utf-8').splitlines()
     
     output = (res.stdout + res.stderr).splitlines()
     return {
