@@ -3,10 +3,9 @@
 MESSAGE="FAIL: $*"
 echo "$MESSAGE"
 
-if [ -n "$FAIL_FD" ]; then
-    # We export the message to safely pass it into the eval block without quote escaping issues
-    export _FAIL_MSG="$MESSAGE"
-    eval "echo \"\$_FAIL_MSG\" >&${FAIL_FD}"
+if [ -n "$TEST_REPORT_FD" ]; then
+    export _REPORT_MSG="$MESSAGE"
+    eval "echo \"\$_REPORT_MSG\" >&${TEST_REPORT_FD}"
 fi
 
 exit 1

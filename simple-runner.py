@@ -11,12 +11,13 @@ def run_test(test_file, env):
     """Executes a single test script and returns its results as a dictionary."""
     test_env = env.copy()
     
-    with tempfile.TemporaryFile() as fail_f:
+    with tempfile.TemporaryFile() as report_f:
         # Get the underlying OS file descriptor
-        fd = fail_f.fileno()
+        fd = report_f.fileno()
         os.set_inheritable(fd, True)
-        test_env["FAIL_FD"] = str(fd)
+        test_env["TEST_REPORT_FD"] = str(fd)
         
+        start_ts = time.monotonic()
         res = subprocess.run(
             ["bash", "-e", test_file.name],
             cwd=test_file.parent,
@@ -25,19 +26,26 @@ def run_test(test_file, env):
             text=True,
             pass_fds=(fd,)
         )
+        duration = time.monotonic() - start_ts
         
-        fail_f.seek(0)
-        fail_messages = fail_f.read().decode('utf-8').splitlines()
+        report_f.seek(0)
+        report_messages = report_f.read().decode('utf-8').splitlines()
     
     output = (res.stdout + res.stderr).splitlines()
     return {
         "testpath": str(test_file),
         "success": res.returncode == 0,
-        "fail_messages": fail_messages,
+        "duration": duration,
+        "report_messages": report_messages,
         "log": output,
         "errors": output if res.returncode != 0 else [],
         "warnings": [line for line in output if "warn" in line.lower()]
     }
+
+def format_time(seconds):
+    """Converts seconds into a MM:SS string."""
+    m, s = divmod(int(seconds), 60)
+    return f"{m:02d}:{s:02d}"
 
 def update_line_status(test_path, status_prefix, test_line_map, total_count):
     """Uses ANSI escape codes to update the status prefix of a specific test line."""
@@ -48,24 +56,22 @@ def update_line_status(test_path, status_prefix, test_line_map, total_count):
     lines_up = (total_count - line_idx) + 1
     with stdout_lock:
         # Save cursor, move up, overwrite start of line, restore cursor
-        # \033[s and \033[u are not supported by all terminals, so we use relative movement
         sys.stdout.write(f"\033[{lines_up}A\r{status_prefix}\033[{lines_up}B")
         sys.stdout.flush()
 
 def run_test_task(test_file, env, test_line_map, total_count, GREEN, RED, NC):
     """Wrapper for run_test that updates the terminal status before and after execution."""
     test_path_str = str(test_file)
-    update_line_status(test_path_str, "[RUN ]", test_line_map, total_count)
+    # The user requested to not use the word "RUN", so we leave the status empty while running.
+    update_line_status(test_path_str, "[    ] --:--", test_line_map, total_count)
     result = run_test(test_file, env)
+    
     status_color = GREEN if result["success"] else RED
     status_text = "PASS" if result["success"] else "FAIL"
-    update_line_status(test_path_str, f"[{status_color}{status_text}{NC}]", test_line_map, total_count)
+    duration_str = format_time(result["duration"])
+    
+    update_line_status(test_path_str, f"[{status_color}{status_text}{NC}] {duration_str}", test_line_map, total_count)
     return result
-
-def format_time(seconds):
-    """Converts seconds into a MM:SS string."""
-    m, s = divmod(int(seconds), 60)
-    return f"{m:02d}:{s:02d}"
 
 def main():
     parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
@@ -91,9 +97,9 @@ def main():
     is_human_tty = (args.output == "human" and sys.stdout.isatty())
 
     if is_human_tty:
-        # Pre-print the full list of tests with empty status
+        # Pre-print the full list of tests with empty status and duration placeholders
         for t in test_files:
-            print(f"[    ] {t}")
+            print(f"[    ] --:-- {t}")
         print("") # Placeholder for the progress bar
         sys.stdout.flush()
 
@@ -131,16 +137,18 @@ def main():
     summary_text = f"Passed: {total_count - failed_count}, Failed: {failed_count}, Total: {total_count}"
     
     if args.output == "human":
-        # Print detailed output for failures or if verbose is enabled
-        failures = [r for r in results if not r["success"]]
-        if failures or args.verbose:
+        # Print detailed output for failures, informational messages or if verbose is enabled
+        has_details = any(r["report_messages"] for r in results)
+        if has_details or args.verbose:
             print("\n" + "="*20 + " DETAILS " + "="*20)
             for r in results:
-                if not r["success"] or args.verbose:
+                if r["report_messages"] or args.verbose:
                     status = f"{GREEN}PASS{NC}" if r["success"] else f"{RED}FAIL{NC}"
-                    print(f"\n[{status}] {r['testpath']}")
-                    for msg in r["fail_messages"]:
-                        print(f"    {RED}-> {msg}{NC}")
+                    print(f"\n[{status}] {format_time(r['duration'])} {r['testpath']}")
+                    for msg in r["report_messages"]:
+                        color = RED if msg.startswith("FAIL:") else ""
+                        reset = NC if msg.startswith("FAIL:") else ""
+                        print(f"    {color}-> {msg}{reset}")
                     if args.verbose and r["log"]:
                         for line in r["log"]:
                             print(f"    {line}")
