@@ -19,6 +19,7 @@ def run_test(test_file, env):
     return {
         "testpath": str(test_file),
         "success": res.returncode == 0,
+        "log": output,
         "errors": output if res.returncode != 0 else [],
         "warnings": [line for line in output if "warn" in line.lower()]
     }
@@ -30,6 +31,11 @@ def main():
         choices=["json", "human"], 
         default="human", 
         help="Output format (default: human)"
+    )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Show test output in human-readable mode"
     )
     args = parser.parse_args()
 
@@ -67,6 +73,11 @@ def main():
             
             # Print the one-line status per testcase
             print(f"[{status}] {r['testpath']}")
+            
+            # If verbose is set, print the logs indented
+            if args.verbose and r["log"]:
+                for line in r["log"]:
+                    print(f"    {line}")
             
         print("-" * 40)
         print(summary_text)
