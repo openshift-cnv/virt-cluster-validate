@@ -128,9 +128,9 @@ class TestVirtClusterValidate(unittest.TestCase):
         # Create a test script that would normally fail instantly with a syntax error
         self._create_test("10-syntax-error.d", "!!!this is not bash!!!")
         
-        # Run with the --mock flag
+        # Run with the --mock flag. Give it a long timeout so it rarely simulates a timeout.
         res = subprocess.run(
-            [sys.executable, str(RUNNER_SCRIPT), "-o", "json", "--mock"],
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "json", "--mock", "-t", "10"],
             cwd=self.workspace,
             capture_output=True,
             text=True
@@ -146,10 +146,10 @@ class TestVirtClusterValidate(unittest.TestCase):
         self.assertTrue(any("Executing simulated test" in log for log in output["results"][0]["log"]))
         
         # The report_messages should contain our simulated pass/fail messages, unless it simulated a timeout
-        if output["results"][0]["cancelled"]:
+        if output["results"][0].get("cancelled"):
             self.assertTrue(any("TIMEOUT" in log for log in output["results"][0]["log"]))
         else:
-            self.assertTrue(any("Simulated" in msg for msg in output["results"][0]["report_messages"]))
+            self.assertTrue(any("simulated" in msg.lower() for msg in output["results"][0]["report_messages"]), f"report_messages were: {output['results'][0]['report_messages']}")
 
 if __name__ == "__main__":
     unittest.main()

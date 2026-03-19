@@ -59,54 +59,54 @@ class TerminalUI:
         with self.lock:
             print("\r\033[K", end="", flush=True)
 
-def run_test(test_file, env, stream_output=False, timeout_secs=180, mock=False):
-    """Executes a single test script in an isolated temporary directory with a timeout."""
+def simulate_test(test_file, stream_output=False, timeout_secs=180):
+    """Simulates a test execution (random runtimes up to 6s, random pass/fail)."""
+    sleep_time = random.uniform(0.5, 6.0)
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
     
-    if mock:
-        sleep_time = random.uniform(0.5, 6.0)
-        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        
-        # Simulate a timeout if the randomly generated sleep time is longer than the actual timeout
-        if sleep_time > timeout_secs:
-            time.sleep(timeout_secs)
-            log_lines = [f"[{ts}] TIMEOUT: Test exceeded {timeout_secs} seconds and was killed."]
-            if stream_output:
-                print(log_lines[0])
-            return {
-                "testpath": str(test_file),
-                "success": False,
-                "cancelled": True,
-                "duration": timeout_secs,
-                "report_messages": [],
-                "log": log_lines,
-                "errors": log_lines,
-                "warnings": []
-            }
-            
-        time.sleep(sleep_time)
-        # Randomize success, but heavily bias toward PASS for a more realistic dashboard
-        success = random.choice([True, True, True, False]) 
-        
-        log_lines = [f"[{ts}] Executing simulated test..."]
+    # Simulate a timeout if the randomly generated sleep time is longer than the actual timeout
+    if sleep_time > timeout_secs:
+        time.sleep(timeout_secs)
+        log_lines = [f"[{ts}] TIMEOUT: Test exceeded {timeout_secs} seconds and was killed."]
         if stream_output:
             print(log_lines[0])
-            
-        if success:
-            report_messages = [f"INFO: Successfully simulated execution of {test_file.name}"]
-        else:
-            report_messages = [f"FAIL: Simulated failure occurred in {test_file.name}"]
-            
         return {
             "testpath": str(test_file),
-            "success": success,
-            "cancelled": False,
-            "duration": sleep_time,
-            "report_messages": report_messages,
+            "success": False,
+            "cancelled": True,
+            "duration": timeout_secs,
+            "report_messages": [],
             "log": log_lines,
-            "errors": log_lines if not success else [],
+            "errors": log_lines,
             "warnings": []
         }
+        
+    time.sleep(sleep_time)
+    # Randomize success, but heavily bias toward PASS for a more realistic dashboard
+    success = random.choice([True, True, True, False]) 
+    
+    log_lines = [f"[{ts}] Executing simulated test..."]
+    if stream_output:
+        print(log_lines[0])
+        
+    if success:
+        report_messages = [f"INFO: Successfully simulated execution of {test_file.name}"]
+    else:
+        report_messages = [f"FAIL: Simulated failure occurred in {test_file.name}"]
+        
+    return {
+        "testpath": str(test_file),
+        "success": success,
+        "cancelled": False,
+        "duration": sleep_time,
+        "report_messages": report_messages,
+        "log": log_lines,
+        "errors": log_lines if not success else [],
+        "warnings": []
+    }
 
+def run_test(test_file, env, stream_output=False, timeout_secs=180):
+    """Executes a single test script in an isolated temporary directory with a timeout."""
     test_env = env.copy()
     
     with tempfile.TemporaryDirectory(prefix="virt_validate_") as temp_dir:
@@ -185,7 +185,11 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180, mock=False):
 def execute_task(test_file, env, ui, stream_output, timeout_secs, mock):
     """Wrapper that updates the terminal status before and after execution."""
     ui.update_test(str(test_file), "[    ]")
-    result = run_test(test_file, env, stream_output, timeout_secs, mock)
+    
+    if mock:
+        result = simulate_test(test_file, stream_output, timeout_secs)
+    else:
+        result = run_test(test_file, env, stream_output, timeout_secs)
     
     if result.get("cancelled"):
         status_str = "[----]"
