@@ -48,7 +48,7 @@ class TerminalUI:
         with self.lock:
             print("\r\033[K", end="", flush=True)
 
-def run_test(test_file, env):
+def run_test(test_file, env, stream_output=False):
     """Executes a single test script in an isolated temporary directory."""
     test_env = env.copy()
     
@@ -67,17 +67,19 @@ def run_test(test_file, env):
             
             start_ts = time.monotonic()
             process = subprocess.Popen(
-                ["bash", "-e", test_file.name],
+                ["bash", "-xe", test_file.name],
                 cwd=temp_path, env=test_env,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, pass_fds=(fd,)
             )
             
+            log_lines = []
             # Iterate process output live for accurate timestamps
-            log_lines = [
-                f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] {line.rstrip()}"
-                for line in process.stdout
-            ]
+            for line in process.stdout:
+                ts_line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] {line.rstrip()}"
+                log_lines.append(ts_line)
+                if stream_output:
+                    print(ts_line)
             
             process.wait()
             duration = time.monotonic() - start_ts
@@ -95,17 +97,17 @@ def run_test(test_file, env):
         "warnings": [line for line in log_lines if "warn" in line.lower()]
     }
 
-def execute_task(test_file, env, ui):
+def execute_task(test_file, env, ui, stream_output):
     """Wrapper that updates the terminal status before and after execution."""
     ui.update_test(str(test_file), "[    ]")
-    result = run_test(test_file, env)
+    result = run_test(test_file, env, stream_output)
     
     status_str = f"[{Colors.GREEN}PASS{Colors.NC}]" if result["success"] else f"[{Colors.RED}FAIL{Colors.NC}]"
     ui.update_test(str(test_file), status_str, format_time(result["duration"]))
     
     return result
 
-def print_details(results, verbose):
+def print_details(results, verbose, skip_log_print=False):
     """Prints the expanded logs and reports for relevant tests."""
     if not any(not r["success"] or r["report_messages"] for r in results) and not verbose:
         return
@@ -120,7 +122,7 @@ def print_details(results, verbose):
                 c = Colors.RED if msg.startswith("FAIL:") else ""
                 print(f"    {c}-> {msg}{Colors.NC if c else ''}")
                 
-            if r["log"] and (not r["success"] or verbose):
+            if r["log"] and (not r["success"] or verbose) and not skip_log_print:
                 print("    --- Test Output ---")
                 for line in r["log"]: print(f"    {line}")
 
@@ -129,18 +131,26 @@ def main():
     parser.add_argument("-o", "--output", choices=["json", "human"], default="human", help="Output format (default: human)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Show test output in human-readable mode")
     parser.add_argument("-f", "--fail-fast", nargs="?", const=1, type=int, metavar="N", help="Stop execution after N failures")
+    parser.add_argument("-s", "--select", metavar="PATH", help="Only run the specific test file provided (e.g. checks.d/10-openshift.d/10-nodes.d/test.sh)")
     args = parser.parse_args()
 
     # 1. Environment & Discovery
     env = {**os.environ, "PATH": f"{os.path.abspath('bin')}{os.pathsep}{os.environ.get('PATH', '')}"}
     test_files = sorted(Path("checks.d").rglob("test*.sh"))
     
+    if args.select:
+        test_files = [t for t in test_files if str(t) == args.select]
+        
     if not test_files:
         print("No tests found.")
         sys.exit(0)
 
     # 2. UI Initialization
-    ui = TerminalUI(test_files, args.output == "human" and sys.stdout.isatty())
+    stream_output = bool(args.select and args.verbose and args.output == "human")
+    # Disable the complex Terminal UI if we are in raw streaming mode
+    is_tty = args.output == "human" and sys.stdout.isatty() and not stream_output
+    
+    ui = TerminalUI(test_files, is_tty)
     ui.init_display(test_files)
     
     # 3. Execution
@@ -150,7 +160,7 @@ def main():
     start_time = time.monotonic()
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {executor.submit(execute_task, t, env, ui): t for t in test_files}
+        futures = {executor.submit(execute_task, t, env, ui, stream_output): t for t in test_files}
         pending = set(futures.keys())
         
         while pending:
@@ -186,7 +196,8 @@ def main():
     summary = f"Passed: {passed}, Failed: {failed}" + (f", Skipped: {skipped}" if skipped else "") + f", Total: {len(test_files)}"
     
     if args.output == "human":
-        print_details(results, args.verbose)
+        # Do not print the log blob a second time if we already streamed it live
+        print_details(results, args.verbose, skip_log_print=stream_output)
         print("-" * 40)
         print(summary)
         print(f"Total time: {format_time(time.monotonic() - start_time)}")
