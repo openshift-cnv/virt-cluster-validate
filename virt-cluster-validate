@@ -13,6 +13,17 @@ def format_time(seconds):
     m, s = divmod(int(seconds), 60)
     return f"{m:02d}:{s:02d}"
 
+def parse_timespan(value):
+    """Parses a human-friendly timespan string (e.g. 2m, 45s, 180) into integer seconds."""
+    if value.isdigit():
+        return int(value)
+    value = value.lower().strip()
+    if value.endswith('m'):
+        return int(value[:-1]) * 60
+    if value.endswith('s'):
+        return int(value[:-1])
+    raise argparse.ArgumentTypeError(f"Invalid timespan: '{value}'. Use format like '2m', '45s', or '180'.")
+
 class TerminalUI:
     """Encapsulates all thread-safe terminal rendering logic."""
     def __init__(self, test_files, is_tty):
@@ -159,7 +170,7 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true", help="Show test output in human-readable mode")
     parser.add_argument("-f", "--fail-fast", nargs="?", const=1, type=int, metavar="N", help="Stop execution after N failures")
     parser.add_argument("-s", "--select", metavar="PATH", help="Only run the specific test file provided (e.g. checks.d/10-openshift.d/10-nodes.d/test.sh)")
-    parser.add_argument("-t", "--timeout", type=int, default=180, metavar="SECONDS", help="Timeout in seconds for each test (default: 180)")
+    parser.add_argument("-t", "--timeout", type=parse_timespan, default="180", metavar="SPAN", help="Timeout for each test (e.g. 3m, 45s, 180; default: 180)")
     args = parser.parse_args()
 
     # 1. Environment & Discovery
