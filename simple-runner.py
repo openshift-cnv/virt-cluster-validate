@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os, sys, json, subprocess, argparse, tempfile, time, threading
+from datetime import datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -26,28 +27,40 @@ def run_test(test_file, env):
             test_env["TEST_REPORT_FD"] = str(fd)
             
             start_ts = time.monotonic()
-            res = subprocess.run(
+            
+            # Using Popen with stderr=subprocess.STDOUT interleaves stdout and stderr 
+            # into a single stream in the correct chronological order.
+            process = subprocess.Popen(
                 ["bash", "-e", test_file.name],
                 cwd=temp_dir,
                 env=test_env,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
                 pass_fds=(fd,)
             )
+            
+            log_lines = []
+            # Read line-by-line as the process emits them to append accurate timestamps
+            for line in process.stdout:
+                # Add a timestamp with millisecond precision
+                ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                log_lines.append(f"[{ts}] {line.rstrip(chr(10))}")
+                
+            process.wait()
             duration = time.monotonic() - start_ts
             
             report_f.seek(0)
             report_messages = report_f.read().decode('utf-8').splitlines()
     
-    output = (res.stdout + res.stderr).splitlines()
     return {
         "testpath": str(test_file),
-        "success": res.returncode == 0,
+        "success": process.returncode == 0,
         "duration": duration,
         "report_messages": report_messages,
-        "log": output,
-        "errors": output if res.returncode != 0 else [],
-        "warnings": [line for line in output if "warn" in line.lower()]
+        "log": log_lines,
+        "errors": log_lines if process.returncode != 0 else [],
+        "warnings": [line for line in log_lines if "warn" in line.lower()]
     }
 
 def format_time(seconds):
@@ -142,7 +155,7 @@ def main():
                 
                 with stdout_lock:
                     sys.stdout.write("\r\033[K") # Clear progress bar line
-                    prog_str = f"Progress: [{bar}] {prog_percent}% ({completed_count}/{total_count}) | Spent: {format_time(elapsed_time)}"
+                    prog_str = f"Progress: [{bar}] {prog_percent}% ({completed_count}/{total_count}) | {format_time(elapsed_time)}"
                     sys.stdout.write(prog_str)
                     sys.stdout.flush()
 
