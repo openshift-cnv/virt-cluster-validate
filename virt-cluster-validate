@@ -236,7 +236,6 @@ def main():
     parser.add_argument("-s", "--select", metavar="PATH", help="Only run the specific test file provided (e.g. checks.d/10-openshift.d/10-nodes.d/test.sh)")
     parser.add_argument("-t", "--timeout", type=parse_timespan, default="180", metavar="SPAN", help="Timeout for each test (e.g. 3m, 45s, 180; default: 180)")
     parser.add_argument("-c", "--concurrency", type=int, default=os.cpu_count() or 4, metavar="N", help="Number of concurrent tests to run (default: CPU count)")
-    parser.add_argument("--mock", action="store_true", help="Simulate execution without cluster interaction (random runtimes up to 6s, random pass/fail)")
     args = parser.parse_args()
 
     # 1. Environment & Discovery
@@ -262,9 +261,11 @@ def main():
     results = []
     failed_count_live = 0
     start_time = time.monotonic()
+    
+    is_mock = os.environ.get("VIRT_VALIDATE_MOCK") == "1"
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {executor.submit(execute_task, t, env, ui, stream_output, args.timeout, args.mock): t for t in test_files}
+        futures = {executor.submit(execute_task, t, env, ui, stream_output, args.timeout, is_mock): t for t in test_files}
         pending = set(futures.keys())
         
         while pending:

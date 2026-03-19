@@ -124,10 +124,13 @@ class TestVirtClusterValidate(unittest.TestCase):
         # Create a test script that would normally fail instantly with a syntax error
         self._create_test("10-syntax-error.d", "!!!this is not bash!!!")
         
-        # Run with the --mock flag. Give it a long timeout so it rarely simulates a timeout.
+        # Run with the VIRT_VALIDATE_MOCK env var. Give it a long timeout so it rarely simulates a timeout.
+        mock_env = os.environ.copy()
+        mock_env["VIRT_VALIDATE_MOCK"] = "1"
         res = subprocess.run(
-            [sys.executable, str(RUNNER_SCRIPT), "-o", "json", "--mock", "-t", "10"],
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "json", "-t", "10"],
             cwd=self.workspace,
+            env=mock_env,
             capture_output=True,
             text=True
         )
