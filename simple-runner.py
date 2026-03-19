@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, json, subprocess, argparse, tempfile, time, threading, shutil
+import os, sys, json, subprocess, argparse, tempfile, time, threading
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -11,11 +11,9 @@ def run_test(test_file, env):
     """Executes a single test script in an isolated temporary directory."""
     test_env = env.copy()
     
-    # Create an isolated workspace for this test
     with tempfile.TemporaryDirectory(prefix="virt_validate_") as temp_dir_str:
         temp_dir = Path(temp_dir_str)
         
-        # Symlink all files from the test's original directory into the temp workspace
         original_dir = test_file.parent
         for item in original_dir.iterdir():
             if item.is_file():
@@ -23,14 +21,11 @@ def run_test(test_file, env):
                 os.symlink(item.absolute(), dest_file)
         
         with tempfile.TemporaryFile() as report_f:
-            # Get the underlying OS file descriptor
             fd = report_f.fileno()
             os.set_inheritable(fd, True)
             test_env["TEST_REPORT_FD"] = str(fd)
             
             start_ts = time.monotonic()
-            
-            # Execute the test script from WITHIN the isolated temporary directory
             res = subprocess.run(
                 ["bash", "-e", test_file.name],
                 cwd=temp_dir,
@@ -75,7 +70,6 @@ def update_line_status(test_path, status_prefix, test_line_map, total_count):
 def run_test_task(test_file, env, test_line_map, total_count, GREEN, RED, NC):
     """Wrapper for run_test that updates the terminal status before and after execution."""
     test_path_str = str(test_file)
-    # The user requested to not use the word "RUN", so we leave the status empty while running.
     update_line_status(test_path_str, "[    ] --:--", test_line_map, total_count)
     result = run_test(test_file, env)
     
@@ -90,6 +84,7 @@ def main():
     parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
     parser.add_argument("-o", "--output", choices=["json", "human"], default="human", help="Output format (default: human)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Show test output in human-readable mode")
+    parser.add_argument("-f", "--fail-fast", nargs="?", const=1, type=int, metavar="N", help="Stop execution after N failures (default: 1 when flag is provided)")
     args = parser.parse_args()
 
     bin_path = os.path.abspath("bin")
@@ -104,8 +99,8 @@ def main():
     test_line_map = {str(t): i for i, t in enumerate(test_files)}
     workers = int(os.environ.get("NUM_CONCURRENT_TESTS", os.cpu_count() or 4))
     
-    GREEN, RED, NC = ('\033[0;32m', '\033[0;31m', '\033[0m')
-    results, completed_count, start_time = ([], 0, time.monotonic())
+    GREEN, RED, YELLOW, NC = ('\033[0;32m', '\033[0;31m', '\033[1;33m', '\033[0m')
+    results, completed_count, start_time, failed_count_live = ([], 0, time.monotonic(), 0)
     
     is_human_tty = (args.output == "human" and sys.stdout.isatty())
 
@@ -123,9 +118,19 @@ def main():
         while pending:
             done, pending = wait(pending, timeout=1.0)
             for f in done:
+                # If a test was cancelled before it started, we skip processing it
+                if f.cancelled():
+                    continue
                 r = f.result()
                 results.append(r)
                 completed_count += 1
+                if not r["success"]:
+                    failed_count_live += 1
+
+            # Check if fail-fast condition is met
+            if args.fail_fast is not None and failed_count_live >= args.fail_fast:
+                for p in pending:
+                    p.cancel()
 
             if is_human_tty:
                 elapsed_time = time.monotonic() - start_time
@@ -144,10 +149,25 @@ def main():
     if is_human_tty:
         sys.stdout.write("\r\033[K") # Final clear of progress bar
         sys.stdout.flush()
+        
+        # Mark any skipped tests with a yellow [SKIP] tag in the UI
+        executed_paths = {r["testpath"] for r in results}
+        for t in test_files:
+            t_str = str(t)
+            if t_str not in executed_paths:
+                update_line_status(t_str, f"[{YELLOW}SKIP{NC}] --:--", test_line_map, total_count)
 
     results.sort(key=lambda x: x["testpath"])
+    
+    executed_count = len(results)
     failed_count = sum(1 for r in results if not r["success"])
-    summary_text = f"Passed: {total_count - failed_count}, Failed: {failed_count}, Total: {total_count}"
+    passed_count = executed_count - failed_count
+    skipped_count = total_count - executed_count
+    
+    summary_text = f"Passed: {passed_count}, Failed: {failed_count}"
+    if skipped_count > 0:
+        summary_text += f", Skipped: {skipped_count}"
+    summary_text += f", Total: {total_count}"
     
     if args.output == "human":
         # Print detailed output for failures, informational messages or if verbose is enabled
@@ -155,18 +175,13 @@ def main():
         if has_details or args.verbose:
             print("\n" + "="*20 + " DETAILS " + "="*20)
             for r in results:
-                # Always show details if the test failed, or if it had a report_message, or if verbose is on
                 if not r["success"] or r["report_messages"] or args.verbose:
                     status = f"{GREEN}PASS{NC}" if r["success"] else f"{RED}FAIL{NC}"
                     print(f"\n[{status}] {format_time(r['duration'])} {r['testpath']}")
-                    
-                    # Print specific pass_with / fail_with messages
                     for msg in r["report_messages"]:
                         color = RED if msg.startswith("FAIL:") else ""
                         reset = NC if msg.startswith("FAIL:") else ""
                         print(f"    {color}-> {msg}{reset}")
-                    
-                    # Print the full standard output log if it failed OR if verbose is on
                     if r["log"] and (not r["success"] or args.verbose):
                         print("    --- Test Output ---")
                         for line in r["log"]:
