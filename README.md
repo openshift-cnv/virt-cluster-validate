@@ -15,7 +15,7 @@ Validates an OpenShift cluster's virtualization readiness.
 *   `oc` and `virtctl` binaries in your `PATH`.
 *   Active `oc login` to the target cluster (required before execution).
 *   Python 3.x (to run the validator).
-*   [Gemini CLI](https://github.com/google/gemini-cli) (Optional, for AI-assisted development).
+*   [Claude Code](https://claude.ai/code) or [Gemini CLI](https://github.com/google/gemini-cli) (Optional, for AI-assisted development).
 
 ## Usage
 
@@ -78,8 +78,13 @@ If you are running in a restricted environment or don't have Python/`oc` install
 
 ### AI-Assisted Development
 
-This project includes a [Gemini CLI](https://github.com/google/gemini-cli) developer skill to ensure architectural consistency.
-To enable it in your workspace:
+This project includes developer skills for both [Claude Code](https://claude.ai/code) and [Gemini CLI](https://github.com/google/gemini-cli) to ensure architectural consistency.
+
+**Claude Code**:
+The `.claude/skills/` directory contains project-specific skills that are automatically loaded when working in this repository.
+
+**Gemini CLI**:
+To enable the Gemini skill in your workspace:
 
     gemini skills install .gemini/skills/virt-cluster-validate-developer-skill/ --scope workspace
 
