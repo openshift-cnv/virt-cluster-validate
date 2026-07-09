@@ -6,3 +6,7 @@ results.d
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Claude local settings (but allow skills to be shared)
+.claude/settings.json
+.claude/settings.local.json
