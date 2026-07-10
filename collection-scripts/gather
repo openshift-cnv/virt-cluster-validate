@@ -45,6 +45,28 @@ rc=0
 
 echo "virt-cluster-validate: finished with exit code ${rc}" | tee -a "${OUTPUT_DIR}/runner.log"
 
+# Print a human-readable summary so the user sees results in the must-gather output
+if [[ -f "${OUTPUT_DIR}/ctrf-results.json" ]]; then
+    python3 -c "
+import json, sys
+r = json.load(open(sys.argv[1]))['results']
+s = r['summary']
+print()
+print('=' * 60)
+print('  virt-cluster-validate results')
+print('=' * 60)
+for t in r['tests']:
+    icon = {'passed': 'PASS', 'failed': 'FAIL', 'skipped': 'SKIP'}.get(t['status'], '????')
+    print(f'  [{icon}] {t[\"name\"]}')
+    if t.get('message'):
+        print(f'         {t[\"message\"]}')
+print('-' * 60)
+print(f'  Passed: {s[\"passed\"]}  Failed: {s[\"failed\"]}  Skipped: {s[\"skipped\"]}  Total: {s[\"tests\"]}')
+print('=' * 60)
+print()
+" "${OUTPUT_DIR}/ctrf-results.json"
+fi
+
 # Sync to ensure all data is written before must-gather tars the results
 sync
 
