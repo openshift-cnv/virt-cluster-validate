@@ -15,7 +15,11 @@ fi
 
 # Use a temporary directory to collect results from concurrent subshells
 TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
+cleanup() {
+  oc delete pods -n "$NAMESPACE" -l app=virt-cluster-validate-c0-check --ignore-not-found=true >/dev/null 2>&1 || true
+  rm -rf "$TMP_DIR"
+}
+trap cleanup EXIT
 
 # Launch a background process for each node
 for NODE_NAME in $NODES; do
@@ -23,12 +27,13 @@ for NODE_NAME in $NODES; do
     # Truncate node name to ensure the pod name is valid
     POD_NAME="c0-check-${NODE_NAME:0:20}-${RANDOM}"
     
-    # Create a regular pod targeted at the specific node
     cat <<POD_YAML | oc create -n "$NAMESPACE" -f - >/dev/null 2>&1
 apiVersion: v1
 kind: Pod
 metadata:
   name: ${POD_NAME}
+  labels:
+    app: virt-cluster-validate-c0-check
 spec:
   nodeName: ${NODE_NAME}
   restartPolicy: Never

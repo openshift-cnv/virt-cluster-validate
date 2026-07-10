@@ -131,24 +131,29 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180):
             
             start_ts = time.monotonic()
             
-            # Start process in a new session so we can kill the entire process group if it times out
             process = subprocess.Popen(
                 ["bash", "-xe", test_file.name],
                 cwd=temp_path, env=test_env,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, pass_fds=(fd,),
                 start_new_session=True
             )
-            
+
             timed_out = [False]
+            GRACE_PERIOD = 10
             def kill_proc():
                 timed_out[0] = True
                 try:
-                    # Kill the entire process group to catch orphaned sleeps/oc commands
-                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    pgid = os.getpgid(process.pid)
+                    os.killpg(pgid, signal.SIGTERM)
+                    try:
+                        process.wait(timeout=GRACE_PERIOD)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(pgid, signal.SIGKILL)
                 except Exception:
                     pass
-                    
+
             timer = threading.Timer(timeout_secs, kill_proc)
             timer.start()
             
@@ -251,10 +256,13 @@ def print_details(results, verbose, skip_log_print=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
-    parser.add_argument("-o", "--output", choices=["json", "human"], default="human", help="Output format (default: human)")
+    parser.add_argument("-o", "--output", choices=["human", "ctrf"], default="human", help="Output format (default: human)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Show test output in human-readable mode")
     parser.add_argument("-f", "--fail-fast", nargs="?", const=1, type=int, metavar="N", help="Stop execution after N failures")
     parser.add_argument("-s", "--select", metavar="PATH", help="Only run the specific test file provided (e.g. checks.d/10-openshift.d/10-nodes.d/test.sh)")
+    parser.add_argument("--include", metavar="PATTERNS", help="Comma-separated substrings to match; only run tests whose path contains at least one pattern")
+    parser.add_argument("--exclude", metavar="PATTERNS", help="Comma-separated substrings to match; skip tests whose path contains any pattern")
+    parser.add_argument("--log-dir", metavar="DIR", help="Write per-check log files to this directory")
     parser.add_argument("-t", "--timeout", type=parse_timespan, default="180", metavar="SPAN", help="Timeout for each test (e.g. 3m, 45s, 180; default: 180)")
     parser.add_argument("-c", "--concurrency", type=int, default=os.cpu_count() or 4, metavar="N", help="Number of concurrent tests to run (default: CPU count)")
     args = parser.parse_args()
@@ -263,9 +271,15 @@ def main():
     env = {**os.environ, "PATH": f"{os.path.abspath('bin')}{os.pathsep}{os.environ.get('PATH', '')}"}
     test_files = sorted(Path("checks.d").rglob("test*.sh"))
     
+    if args.include:
+        patterns = [p.strip() for p in args.include.split(",")]
+        test_files = [t for t in test_files if any(p in str(t) for p in patterns)]
+    if args.exclude:
+        patterns = [p.strip() for p in args.exclude.split(",")]
+        test_files = [t for t in test_files if not any(p in str(t) for p in patterns)]
     if args.select:
         test_files = [t for t in test_files if str(t) == args.select]
-        
+
     if not test_files:
         print("No tests found.")
         sys.exit(0)
@@ -282,6 +296,7 @@ def main():
     results = []
     failed_count_live = 0
     start_time = time.monotonic()
+    start_epoch_ms = int(time.time() * 1000)
     
     is_mock = os.environ.get("VIRT_VALIDATE_MOCK") == "1"
 
@@ -313,7 +328,14 @@ def main():
 
     # 5. Output Results
     results.sort(key=lambda x: x["testpath"])
-    
+
+    if args.log_dir:
+        os.makedirs(args.log_dir, exist_ok=True)
+        for r in results:
+            name = r["testpath"].replace("checks.d/", "").replace("/", "_")
+            with open(os.path.join(args.log_dir, f"{name}.log"), "w") as f:
+                f.write("\n".join(r["log"]))
+
     # Unified Summary Calculation
     passed = sum(1 for r in results if r["success"] and not r.get("has_warnings"))
     warnings = sum(1 for r in results if r["success"] and r.get("has_warnings"))
@@ -333,9 +355,63 @@ def main():
         print("-" * 40)
         print(summary)
         print(f"Total time: {format_time(time.monotonic() - start_time)}")
-    else:
-        print(json.dumps({"summary": summary, "results": results}, indent=2))
-        
+    elif args.output == "ctrf":
+        stop_epoch_ms = int(time.time() * 1000)
+        executed_paths = {r["testpath"] for r in results}
+
+        def ctrf_status(r):
+            if r["success"]:
+                return "passed"
+            return "failed"
+
+        def ctrf_suite(testpath):
+            parts = testpath.split("/")
+            if len(parts) >= 2:
+                return parts[1].removesuffix(".d")
+            return ""
+
+        ctrf_tests = []
+        for r in results:
+            name = r["testpath"].removeprefix("checks.d/")
+            entry = {
+                "name": name,
+                "status": ctrf_status(r),
+                "duration": int(r["duration"] * 1000),
+                "suite": ctrf_suite(r["testpath"]),
+            }
+            if r["report_messages"]:
+                entry["message"] = "; ".join(r["report_messages"])
+            if not r["success"] and r["log"]:
+                entry["trace"] = "\n".join(r["log"])
+            ctrf_tests.append(entry)
+
+        for t in test_files:
+            if str(t) not in executed_paths:
+                ctrf_tests.append({
+                    "name": str(t).removeprefix("checks.d/"),
+                    "status": "skipped",
+                    "duration": 0,
+                    "suite": ctrf_suite(str(t)),
+                })
+
+        ctrf_report = {
+            "results": {
+                "tool": {"name": "virt-cluster-validate"},
+                "summary": {
+                    "tests": len(test_files),
+                    "passed": passed + warnings,
+                    "failed": failed + cancelled,
+                    "pending": 0,
+                    "skipped": skipped,
+                    "other": 0,
+                    "start": start_epoch_ms,
+                    "stop": stop_epoch_ms,
+                },
+                "tests": ctrf_tests,
+            }
+        }
+        print(json.dumps(ctrf_report, indent=2))
+
     sys.exit(1 if failed_count_live > 0 else 0)
 
 if __name__ == "__main__":

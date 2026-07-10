@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+#
+# Must-gather entry point for virt-cluster-validate.
+#
+# Usage:
+#   oc adm must-gather --image=<image> -- /usr/bin/gather
+#   oc adm must-gather --image=<image> -- CHECKS=nodes,basic /usr/bin/gather
+#   oc adm must-gather --image=<image> -- SKIP_CHECKS=rebalance TIMEOUT=5m /usr/bin/gather
+#
+
+set -euo pipefail
+
+BASE_DIR="/opt/app-root/src"
+OUTPUT_DIR="${MUST_GATHER:-/must-gather}/virt-cluster-validate"
+
+mkdir -p "${OUTPUT_DIR}/logs"
+
+RUNNER_ARGS=("-o" "ctrf" "--log-dir" "${OUTPUT_DIR}/logs")
+
+if [[ -n "${CHECKS:-}" ]]; then
+    RUNNER_ARGS+=("--include" "${CHECKS}")
+fi
+
+if [[ -n "${SKIP_CHECKS:-}" ]]; then
+    RUNNER_ARGS+=("--exclude" "${SKIP_CHECKS}")
+fi
+
+if [[ -n "${TIMEOUT:-}" ]]; then
+    RUNNER_ARGS+=("--timeout" "${TIMEOUT}")
+fi
+
+if [[ -n "${CONCURRENCY:-}" ]]; then
+    RUNNER_ARGS+=("--concurrency" "${CONCURRENCY}")
+fi
+
+echo "virt-cluster-validate: running with args: ${RUNNER_ARGS[*]}"
+
+cd "${BASE_DIR}"
+
+rc=0
+"${BASE_DIR}/virt-cluster-validate" "${RUNNER_ARGS[@]}" \
+    > "${OUTPUT_DIR}/ctrf-results.json" \
+    2> "${OUTPUT_DIR}/runner.log" \
+    || rc=$?
+
+echo "virt-cluster-validate: finished with exit code ${rc}" | tee -a "${OUTPUT_DIR}/runner.log"
+
+# Sync to ensure all data is written before must-gather tars the results
+sync
+
+# Always exit 0 -- must-gather should not fail because checks found issues.
+# The CTRF results carry the pass/fail signal.
+exit 0
