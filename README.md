@@ -28,20 +28,29 @@ Validates an OpenShift cluster's virtualization readiness.
     # Verbose run (Shows full logs)
     ./virt-cluster-validate -v
 
-    # JSON output (For automation)
-    ./virt-cluster-validate -o json
+    # Run only specific checks (substring match)
+    ./virt-cluster-validate --include nodes,basic
+
+    # Skip specific checks
+    ./virt-cluster-validate --exclude high-performance,rebalance
+
+    # CTRF output (For CI/CD integration)
+    ./virt-cluster-validate -o ctrf
 
     # Fail fast (Stop after 1 failure)
     ./virt-cluster-validate -f
 
-    # Identify slowest tests
-    ./virt-cluster-validate --help
+    # Write per-check logs to a directory
+    ./virt-cluster-validate --log-dir /tmp/check-logs
 
 ### CLI Options
 
-*   `-o {human,json}`: Output format (Default: `human`).
+*   `-o {human,ctrf}`: Output format (Default: `human`). `ctrf` produces a [CTRF](https://ctrf.io) JSON report.
 *   `-v, --verbose`: Print full bash logs for every test.
 *   `-s, --select PATH`: Run only a specific test script.
+*   `--include PATTERNS`: Comma-separated substrings; only run tests whose path contains at least one pattern (e.g. `--include nodes,basic`).
+*   `--exclude PATTERNS`: Comma-separated substrings; skip tests whose path contains any pattern (e.g. `--exclude high-performance,rebalance`).
+*   `--log-dir DIR`: Write per-check log files to the given directory.
 *   `-t, --timeout SPAN`: Max execution time per test (e.g. `2m`, `45s`, `180`. Default: `180`).
 *   `-c, --concurrency N`: Number of tests to run in parallel (Default: Number of CPU cores).
 *   `-f [N], --fail-fast [N]`: Stop execution after N failures (Default: 1).
@@ -70,6 +79,43 @@ If you are running in a restricted environment or don't have Python/`oc` install
       myregistry.internal/virt-cluster-validate:latest
     ```
 
+## Must-Gather Integration
+
+The container image includes a must-gather entry point, allowing you to run the validation checks via `oc adm must-gather`. This is the easiest way to run the tool — no local prerequisites needed.
+
+    # Run all checks
+    oc adm must-gather --image=<image> -- /usr/bin/gather
+
+    # Run only specific checks (substring match on test paths)
+    oc adm must-gather --image=<image> -- CHECKS=nodes,basic /usr/bin/gather
+
+    # Skip specific checks
+    oc adm must-gather --image=<image> -- SKIP_CHECKS=high-performance,rebalance /usr/bin/gather
+
+    # Custom timeout and concurrency
+    oc adm must-gather --image=<image> -- TIMEOUT=5m CONCURRENCY=2 /usr/bin/gather
+
+### Environment Variables
+
+*   `CHECKS`: Comma-separated substrings to select which checks to run (maps to `--include`).
+*   `SKIP_CHECKS`: Comma-separated substrings to skip certain checks (maps to `--exclude`).
+*   `TIMEOUT`: Per-check timeout (e.g. `5m`, `300`. Default: `180`).
+*   `CONCURRENCY`: Number of parallel checks (Default: CPU count).
+
+### Output
+
+The must-gather archive will contain:
+
+    must-gather.local.<id>/<image-hash>/virt-cluster-validate/
+    ├── ctrf-results.json    # CTRF-formatted test results
+    ├── runner.log           # Runner stderr/diagnostics
+    └── logs/                # Per-check execution logs
+        ├── 10-openshift.d_00-login.d_test.sh.log
+        ├── 10-openshift.d_10-nodes.d_test.sh.log
+        └── ...
+
+The `ctrf-results.json` file follows the [CTRF (Common Test Report Format)](https://ctrf.io) specification and can be consumed by any CTRF-compatible tooling.
+
 ## Development & Testing
 
 ### Unit Tests
@@ -88,4 +134,4 @@ To enable the Gemini skill in your workspace:
 
     gemini skills install .gemini/skills/virt-cluster-validate-developer-skill/ --scope workspace
 
-To add checks, create a new directory in `checks.d/` and add a script matching `test*.sh`. Use `pass_with` and `fail_with` helpers from `bin/`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to write new checks.

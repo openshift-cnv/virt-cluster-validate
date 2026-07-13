@@ -1,10 +1,14 @@
 #!/usr/bin/bash
 
+cleanup() {
+  [ -f restore.yaml ] && oc delete -f restore.yaml --ignore-not-found=true >/dev/null 2>&1 || true
+  [ -f snap.yaml ] && oc delete -f snap.yaml --ignore-not-found=true >/dev/null 2>&1 || true
+  [ -f vm.yaml ] && oc delete -f vm.yaml --ignore-not-found=true >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
 oc create -f vm.yaml
-
-#  oc wait --for=condition=Ready=true -f vm.yaml \
-#  || fail_with Scheduling "Unable to schedule VMs?"
 
 VMNAME=$(oc get -o jsonpath='{.metadata.name}' -f vm.yaml)
 
@@ -23,10 +27,10 @@ spec:
 EOF
 oc apply -f snap.yaml
 
-oc wait -f snap.yaml --for condition=Ready \
+oc wait -f snap.yaml --for condition=Ready --timeout=2m \
 || {
   oc get -o yaml -f snap.yaml
-  fail_with Create  "Failed to create snapshot with default storageclass"
+  fail_with Create "Failed to create snapshot with default storageclass"
 }
 
 tee restore.yaml <<EOF
@@ -42,8 +46,8 @@ spec:
   virtualMachineSnapshotName: snap-${VMNAME}
 EOF
 oc apply -f restore.yaml
-oc wait -f restore.yaml --for condition=Ready \
+oc wait -f restore.yaml --for condition=Ready --timeout=2m \
 || {
   oc get -o yaml -f restore.yaml
-  fail_with Restore  "Failed to restore snapshots"
+  fail_with Restore "Failed to restore snapshots"
 }
