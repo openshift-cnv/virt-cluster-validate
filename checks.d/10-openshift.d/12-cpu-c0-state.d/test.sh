@@ -7,8 +7,8 @@ if [ -z "$NODES" ]; then
   exit 0
 fi
 
-# We need a namespace to run our temporary pods in.
-NAMESPACE=$(oc config view --minify -o jsonpath='{..namespace}' 2>/dev/null)
+# Use the must-gather namespace if available, otherwise detect from context
+NAMESPACE="${VIRT_VALIDATE_NAMESPACE:-$(oc config view --minify -o jsonpath='{..namespace}' 2>/dev/null)}"
 if [ -z "$NAMESPACE" ]; then
   NAMESPACE="default"
 fi

@@ -5,7 +5,8 @@ USER 0
 # Install required CLI tools for the validation checks
 RUN dnf install -y jq && dnf clean all && \
     curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar -xz -C /usr/local/bin/ oc && \
-    curl -L https://github.com/kubevirt/kubevirt/releases/download/v1.1.1/virtctl-v1.1.1-linux-amd64 -o /usr/local/bin/virtctl && \
+    VIRTCTL_VERSION=$(curl -sL https://api.github.com/repos/kubevirt/kubevirt/releases/latest | python3 -c "import sys,json;print(json.load(sys.stdin)['tag_name'])") && \
+    curl -L "https://github.com/kubevirt/kubevirt/releases/download/${VIRTCTL_VERSION}/virtctl-${VIRTCTL_VERSION}-linux-amd64" -o /usr/local/bin/virtctl && \
     chmod +x /usr/local/bin/oc /usr/local/bin/virtctl
 
 USER 1001

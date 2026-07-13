@@ -3,10 +3,10 @@
 step Connectivity
 oc whoami
 oc whoami --show-server
-oc get project || fail_with "Unable to retrieve projects from cluster"
+oc cluster-info || fail_with "Unable to reach the cluster API"
 
 step Availability
-oc get projects | grep openshift-cnv \
+oc get namespace openshift-cnv >/dev/null 2>&1 \
 || fail_with "OpenShift Virtualization does not seem to be present. Did you install the OpenShift Virtualization operator?"
 
 step Auth
