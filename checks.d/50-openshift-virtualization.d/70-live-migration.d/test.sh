@@ -1,8 +1,10 @@
 #!/usr/bin/bash
 
+NS="${VIRT_VALIDATE_NAMESPACE:-}"
+
 cleanup() {
-  [ -f migration.yaml ] && oc delete -f migration.yaml --ignore-not-found=true >/dev/null 2>&1 || true
-  [ -f vm.yaml ] && oc delete -f vm.yaml --ignore-not-found=true >/dev/null 2>&1 || true
+  [ -f migration.yaml ] && oc delete ${NS:+-n "$NS"} -f migration.yaml --ignore-not-found=true >/dev/null 2>&1 || true
+  [ -f vm.yaml ] && oc delete ${NS:+-n "$NS"} -f vm.yaml --ignore-not-found=true >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -12,13 +14,13 @@ oc auth can-i create virtualmachineinstancemigrations.kubevirt.io || {
 }
 
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
-oc create -f vm.yaml
+oc create ${NS:+-n "$NS"} -f vm.yaml
 
-VMNAME=$(oc get -o jsonpath='{.metadata.name}' -f vm.yaml)
+VMNAME=$(oc get ${NS:+-n "$NS"} -o jsonpath='{.metadata.name}' -f vm.yaml)
 
-oc wait --for=condition=Ready=true --timeout=2m -f vm.yaml \
+oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout=2m -f vm.yaml \
 || {
-  oc get -o yaml vm $VMNAME
+  oc get ${NS:+-n "$NS"} -o yaml vm $VMNAME
   fail_with Scheduling "Unable to schedule VMs?"
 }
 
@@ -31,11 +33,11 @@ spec:
   vmiName: ${VMNAME}
 status: {}
 EOF
-oc apply -f migration.yaml
+oc apply ${NS:+-n "$NS"} -f migration.yaml
 
-oc wait --for=jsonpath='{.status.phase}'=Succeeded --timeout=2m -f migration.yaml \
+oc wait ${NS:+-n "$NS"} --for=jsonpath='{.status.phase}'=Succeeded --timeout=2m -f migration.yaml \
 || {
-  oc get -o yaml -f vm.yaml
-  oc get -o yaml -f migration.yaml
+  oc get ${NS:+-n "$NS"} -o yaml -f vm.yaml
+  oc get ${NS:+-n "$NS"} -o yaml -f migration.yaml
   fail_with Migration "VM failed to migrate"
 }

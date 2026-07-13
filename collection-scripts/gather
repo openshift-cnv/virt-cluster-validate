@@ -13,6 +13,14 @@ set -euo pipefail
 BASE_DIR="/opt/app-root/src"
 OUTPUT_DIR="${MUST_GATHER:-/must-gather}/virt-cluster-validate"
 
+# Export the must-gather namespace so check scripts create resources there.
+# When the must-gather namespace is deleted, all resources are cleaned up automatically.
+MG_NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null || echo "")
+if [[ -n "${MG_NAMESPACE}" ]]; then
+    export VIRT_VALIDATE_NAMESPACE="${MG_NAMESPACE}"
+    echo "virt-cluster-validate: using namespace ${MG_NAMESPACE} for test resources"
+fi
+
 mkdir -p "${OUTPUT_DIR}/logs"
 
 RUNNER_ARGS=("-o" "ctrf" "--log-dir" "${OUTPUT_DIR}/logs")
