@@ -268,7 +268,10 @@ def main():
     args = parser.parse_args()
 
     # 1. Environment & Discovery
-    env = {**os.environ, "PATH": f"{os.path.abspath('bin')}{os.pathsep}{os.environ.get('PATH', '')}"}
+    cache_dir = tempfile.mkdtemp(prefix="virt_validate_cache_")
+    env = {**os.environ,
+           "PATH": f"{os.path.abspath('bin')}{os.pathsep}{os.environ.get('PATH', '')}",
+           "VIRT_VALIDATE_CACHE_DIR": cache_dir}
     test_files = sorted(Path("checks.d").rglob("test*.sh"))
     
     if args.include:
@@ -411,6 +414,9 @@ def main():
             }
         }
         print(json.dumps(ctrf_report, indent=2))
+
+    import shutil
+    shutil.rmtree(cache_dir, ignore_errors=True)
 
     sys.exit(1 if failed_count_live > 0 else 0)
 
