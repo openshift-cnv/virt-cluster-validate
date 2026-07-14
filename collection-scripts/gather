@@ -11,6 +11,20 @@
 set -euo pipefail
 
 BASE_DIR="/opt/app-root/src"
+
+# Download oc and virtctl from cluster
+"${BASE_DIR}/bin/download-tools.sh"
+
+# Debug mode: execute DEBUG_TOOL if set
+if [[ -n "${DEBUG_TOOL:-}" ]]; then
+    exec /bin/bash -c "${DEBUG_TOOL}"
+fi
+
+# Check if running in must-gather mode
+if [[ "${POD_NAME:-}" != *"must-gather"* ]]; then
+    exec "${BASE_DIR}/virt-cluster-validate" -v
+fi
+
 OUTPUT_DIR="${MUST_GATHER:-/must-gather}/virt-cluster-validate"
 
 # Export the must-gather namespace so check scripts create resources there.
