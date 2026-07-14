@@ -50,7 +50,18 @@ mv /usr/local/bin/oc.rhel9 /usr/local/bin/oc
 chmod +x /usr/local/bin/oc
 
 # Download and install virtctl
-curl -ksSL "https://hyperconverged-cluster-cli-download-openshift-cnv.apps.${CLUSTER_DOMAIN}/amd64/linux/virtctl.tar.gz" | tar -xzf - -C /usr/local/bin/
-chmod +x /usr/local/bin/virtctl
+# Try both possible route names (downstream openshift-cnv, upstream kubevirt-hyperconverged)
+for namespace in openshift-cnv kubevirt-hyperconverged; do
+    VIRTCTL_URL="https://hyperconverged-cluster-cli-download-${namespace}.apps.${CLUSTER_DOMAIN}/amd64/linux/virtctl.tar.gz"
+    if curl -ksSL "$VIRTCTL_URL" | tar -xzf - -C /usr/local/bin/ 2>/dev/null; then
+        chmod +x /usr/local/bin/virtctl
+        break
+    fi
+done
+
+if [ ! -f /usr/local/bin/virtctl ]; then
+    echo "ERROR: Failed to download virtctl from any known route" >&2
+    exit 1
+fi
 
 echo "Tools downloaded successfully" >&2
