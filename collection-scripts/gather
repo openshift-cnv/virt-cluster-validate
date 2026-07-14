@@ -12,6 +12,9 @@ set -euo pipefail
 
 BASE_DIR="/opt/app-root/src"
 
+# Download oc and virtctl from cluster
+"${BASE_DIR}/bin/download-tools.sh"
+
 # Debug mode: execute DEBUG_TOOL if set
 if [[ -n "${DEBUG_TOOL:-}" ]]; then
     exec /bin/bash -c "${DEBUG_TOOL}"
