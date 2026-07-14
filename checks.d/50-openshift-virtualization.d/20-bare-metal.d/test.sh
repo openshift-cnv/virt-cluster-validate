@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
 INFRA=$(oc get infrastructure cluster -o json | jq -re '.spec.platformSpec.type')
-INFRA_INSTANCE_TYPES=$(oc get nodes -o json | jq -re '.items[] | .metadata.labels["node.kubernetes.io/instance-type"]' | sort -u)
+INFRA_INSTANCE_TYPES=$(oc_cached nodes get nodes -o json | jq -re '.items[] | .metadata.labels["node.kubernetes.io/instance-type"]' | sort -u)
 
 case "$INFRA" in
   BareMetal|None) pass_with info Infrastructure "Platform '$INFRA'" ;;

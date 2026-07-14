@@ -1,0 +1,42 @@
+#!/usr/bin/bash
+# Usage: oc_cached <cache_key> <oc args...>
+# Example: oc_cached nodes get nodes -o json > nodes.json
+#
+# When VIRT_VALIDATE_CACHE_DIR is set, fetches once and caches.
+# Concurrent callers with the same key block on flock until the
+# first caller finishes, then read the cached file.
+# When VIRT_VALIDATE_CACHE_DIR is unset, falls through to oc.
+
+CACHE_DIR="${VIRT_VALIDATE_CACHE_DIR:-}"
+KEY="$1"; shift
+
+if [ -z "$CACHE_DIR" ]; then
+  exec oc "$@"
+fi
+
+CACHE_FILE="$CACHE_DIR/$KEY.json"
+LOCK_FILE="$CACHE_DIR/$KEY.lock"
+FAIL_MARKER="$CACHE_DIR/$KEY.failed"
+
+(
+  flock 9 || exit 1
+  if [ -f "$CACHE_FILE" ]; then
+    exit 0
+  fi
+  if [ -f "$FAIL_MARKER" ]; then
+    exit 1
+  fi
+  if oc "$@" > "$CACHE_FILE.tmp" 2>/dev/null; then
+    mv "$CACHE_FILE.tmp" "$CACHE_FILE"
+  else
+    rm -f "$CACHE_FILE.tmp"
+    touch "$FAIL_MARKER"
+    exit 1
+  fi
+) 9>"$LOCK_FILE"
+
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+cat "$CACHE_FILE"
