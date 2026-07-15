@@ -22,8 +22,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-virtctl create vm --instancetype cx1.medium --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
+virtctl create vm --instancetype cx1.medium --termination-grace-period=0 --volume-import=type:blank,size:1Gi | tee vm.yaml
 oc create ${NS:+-n "$NS"} -f vm.yaml
+
+DVNAME=$(oc get ${NS:+-n "$NS"} -o jsonpath='{.spec.dataVolumeTemplates[0].metadata.name}' -f vm.yaml)
+
+oc wait ${NS:+-n "$NS"} datavolume/$DVNAME --for=jsonpath='{.status.phase}'=Succeeded --timeout=5m \
+|| {
+  oc get ${NS:+-n "$NS"} -o yaml datavolume/$DVNAME
+  fail_with Create "Unable to prepare the high performance VM disk."
+}
 
 oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout=45s -f vm.yaml \
 || {

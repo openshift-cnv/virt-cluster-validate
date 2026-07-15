@@ -22,8 +22,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
+virtctl create vm --termination-grace-period=0 --volume-import=type:blank,size:1Gi | tee vm.yaml
 oc create ${NS:+-n "$NS"} -f vm.yaml
+
+DVNAME=$(oc get ${NS:+-n "$NS"} -o jsonpath='{.spec.dataVolumeTemplates[0].metadata.name}' -f vm.yaml)
+
+oc wait ${NS:+-n "$NS"} datavolume/$DVNAME --for=jsonpath='{.status.phase}'=Succeeded --timeout=5m \
+|| {
+  oc get ${NS:+-n "$NS"} -o yaml datavolume/$DVNAME
+  fail_with Create "VM disk was not ready"
+}
 
 oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout=2m -f vm.yaml \
 || {
