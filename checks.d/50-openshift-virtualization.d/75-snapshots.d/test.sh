@@ -18,9 +18,9 @@
 NS="${VIRT_VALIDATE_NAMESPACE:-}"
 
 cleanup() {
-  [ -f restore.yaml ] && oc delete ${NS:+-n "$NS"} -f restore.yaml --ignore-not-found=true --force --grace-period=0 >/dev/null 2>&1 || true
-  [ -f snap.yaml ] && oc delete ${NS:+-n "$NS"} -f snap.yaml --ignore-not-found=true --force --grace-period=0 >/dev/null 2>&1 || true
-  [ -f vm.yaml ] && oc delete ${NS:+-n "$NS"} -f vm.yaml --ignore-not-found=true --force --grace-period=0 >/dev/null 2>&1 || true
+  [ -f restore.yaml ] && oc delete ${NS:+-n "$NS"} -f restore.yaml --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
+  [ -f snap.yaml ] && oc delete ${NS:+-n "$NS"} -f snap.yaml --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
+  [ -f vm.yaml ] && oc delete ${NS:+-n "$NS"} -f vm.yaml --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
