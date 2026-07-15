@@ -19,7 +19,7 @@
 # Usage:
 #   oc adm must-gather --image=<image> -- /usr/bin/gather
 #   oc adm must-gather --image=<image> -- CHECKS=nodes,basic /usr/bin/gather
-#   oc adm must-gather --image=<image> -- SKIP_CHECKS=rebalance TIMEOUT=5m /usr/bin/gather
+#   oc adm must-gather --image=<image> -- SKIP_CHECKS=rebalance,bare-metal TIMEOUT=5m /usr/bin/gather
 #
 
 set -euo pipefail
