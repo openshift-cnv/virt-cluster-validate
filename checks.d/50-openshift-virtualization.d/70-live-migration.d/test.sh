@@ -28,7 +28,8 @@ oc auth can-i create virtualmachineinstancemigrations.kubevirt.io || {
 }
 
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
-oc create ${NS:+-n "$NS"} -f vm.yaml
+oc create ${NS:+-n "$NS"} -f vm.yaml \
+  || fail_with Setup "Failed to create test VM"
 
 VMNAME=$(oc get ${NS:+-n "$NS"} -o jsonpath='{.metadata.name}' -f vm.yaml)
 

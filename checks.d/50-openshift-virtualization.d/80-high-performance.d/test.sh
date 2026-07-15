@@ -23,10 +23,11 @@ cleanup() {
 trap cleanup EXIT
 
 virtctl create vm --instancetype cx1.medium --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
-oc create ${NS:+-n "$NS"} -f vm.yaml
+oc create ${NS:+-n "$NS"} -f vm.yaml \
+  || fail_with Setup "Failed to create high-performance test VM"
 
 oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout=45s -f vm.yaml \
 || {
   oc get ${NS:+-n "$NS"} -o yaml -f vm.yaml
-  pass_with warn Scheduling "Unable to schedule high performance VMs. Is the CPU manager enabled?"
+  fail_with Scheduling "Unable to schedule high-performance VMs. Is the CPU manager enabled?"
 }

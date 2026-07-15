@@ -30,12 +30,15 @@ if [ "$VSC_COUNT" -eq 0 ]; then
 fi
 
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
-oc create ${NS:+-n "$NS"} -f vm.yaml
+oc create ${NS:+-n "$NS"} -f vm.yaml \
+  || fail_with Setup "Failed to create test VM"
 
 VMNAME=$(oc get ${NS:+-n "$NS"} -o jsonpath='{.metadata.name}' -f vm.yaml)
 
-oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout=2m -f vm.yaml
-virtctl stop ${NS:+-n "$NS"} "$VMNAME"
+oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout=2m -f vm.yaml \
+  || fail_with Setup "VM did not become Ready"
+virtctl stop ${NS:+-n "$NS"} "$VMNAME" \
+  || fail_with Setup "Failed to stop VM"
 
 tee snap.yaml <<EOF
 apiVersion: snapshot.kubevirt.io/v1alpha1
@@ -48,12 +51,13 @@ spec:
     kind: VirtualMachine
     name: ${VMNAME}
 EOF
-oc apply ${NS:+-n "$NS"} -f snap.yaml
+oc apply ${NS:+-n "$NS"} -f snap.yaml \
+  || fail_with Snapshot "Failed to apply snapshot resource"
 
 oc wait ${NS:+-n "$NS"} -f snap.yaml --for condition=Ready --timeout=2m \
 || {
   oc get ${NS:+-n "$NS"} -o yaml -f snap.yaml
-  fail_with Create "Failed to create snapshot with default storageclass"
+  fail_with Snapshot "Failed to create snapshot with default storageclass"
 }
 
 tee restore.yaml <<EOF
@@ -68,7 +72,8 @@ spec:
     name: ${VMNAME}
   virtualMachineSnapshotName: snap-${VMNAME}
 EOF
-oc apply ${NS:+-n "$NS"} -f restore.yaml
+oc apply ${NS:+-n "$NS"} -f restore.yaml \
+  || fail_with Restore "Failed to apply restore resource"
 oc wait ${NS:+-n "$NS"} -f restore.yaml --for condition=Ready --timeout=2m \
 || {
   oc get ${NS:+-n "$NS"} -o yaml -f restore.yaml
