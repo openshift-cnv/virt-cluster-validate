@@ -16,7 +16,7 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 oc_cached nodes get nodes -o json > nodes.json \
   || fail_with "Unable to get nodes"
@@ -26,7 +26,7 @@ SCHEDULABLE_NODES=$(cat nodes.json | jq '[.items[] | select(.metadata.labels["ku
 NODE_COUNT=$(echo "$SCHEDULABLE_NODES" | jq 'length')
 
 [[ "$NODE_COUNT" -gt 1 ]] \
-  || { pass_with info "Single schedulable node, CPU model consistency N/A"; exit 0; }
+  || { skip_with "Single schedulable node, CPU model consistency N/A"; }
 
 CPU_MODELS=$(echo "$SCHEDULABLE_NODES" | jq -r '
   [.[] | .metadata.labels | to_entries[]

@@ -16,10 +16,10 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 oc get crd hostpathprovisioners.hostpathprovisioner.kubevirt.io >/dev/null 2>&1 \
-  || { pass_with info "HostPathProvisioner not installed"; exit 0; }
+  || { skip_with "HostPathProvisioner not installed"; }
 
 step "HPP Health"
 HPP_STATUS=$(oc get hostpathprovisioners -o json 2>/dev/null \

@@ -16,10 +16,10 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 oc_cached vms get vm -A -o json > vms.json 2>/dev/null \
-  || { pass_with info "No VirtualMachine resources found"; exit 0; }
+  || { skip_with "No VirtualMachine resources found"; }
 
 WIN_VMS=$(cat vms.json | jq '[.items[] | select(
   ((.metadata.labels // {}) | to_entries[]? | select(.key | test("os.template.kubevirt.io/win"))) or
@@ -27,7 +27,7 @@ WIN_VMS=$(cat vms.json | jq '[.items[] | select(
 )] | length')
 
 [[ "$WIN_VMS" -gt 0 ]] \
-  || { pass_with info "No Windows VMs found on the cluster"; exit 0; }
+  || { skip_with "No Windows VMs found on the cluster"; }
 
 pass_with info "Found $WIN_VMS Windows VM(s)"
 

@@ -16,17 +16,16 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 oc get crd migrationpolicies.migrations.kubevirt.io >/dev/null 2>&1 \
-  || { pass_with info "MigrationPolicy CRD not available"; exit 0; }
+  || { skip_with "MigrationPolicy CRD not available"; }
 
 oc get migrationpolicies -A -o json > mp.json 2>/dev/null
 MP_COUNT=$(cat mp.json | jq '.items | length')
 
 if [ "$MP_COUNT" -eq 0 ]; then
-  pass_with info "No MigrationPolicies defined (cluster defaults apply)"
-  exit 0
+  skip_with "No MigrationPolicies defined (cluster defaults apply)"
 fi
 
 step "Migration Tuning"

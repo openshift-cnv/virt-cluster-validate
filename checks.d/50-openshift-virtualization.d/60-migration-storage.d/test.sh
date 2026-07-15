@@ -16,10 +16,10 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 oc_cached vms get vm -A -o json > vms.json 2>/dev/null \
-  || { pass_with info "No VirtualMachine resources found"; exit 0; }
+  || { skip_with "No VirtualMachine resources found"; }
 
 CLUSTER_EVICTION=$(oc get kubevirt kubevirt -n openshift-cnv -o json 2>/dev/null \
   | jq -r '.spec.configuration.evictionStrategy // empty' 2>/dev/null)
@@ -32,7 +32,7 @@ MIGRATE_VMS=$(cat vms.json | jq --arg default "${CLUSTER_EVICTION:-none}" '
 MIGRATE_COUNT=$(echo "$MIGRATE_VMS" | jq 'length')
 
 [[ "$MIGRATE_COUNT" -gt 0 ]] \
-  || { pass_with info "No VMs with LiveMigrate eviction strategy"; exit 0; }
+  || { skip_with "No VMs with LiveMigrate eviction strategy"; }
 
 step "PVC Access Modes"
 oc_cached pvcs get pvc -A -o json > pvc.json 2>/dev/null

@@ -16,10 +16,10 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 oc get namespace openshift-sriov-network-operator >/dev/null 2>&1 \
-  || { pass_with info "SR-IOV Network Operator not installed, skipping"; exit 0; }
+  || { skip_with "SR-IOV Network Operator not installed, skipping"; }
 
 step "CSV Health"
 CSV_PHASE=$(oc get csv -n openshift-sriov-network-operator -o json 2>/dev/null \

@@ -16,7 +16,7 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 step "NNCE Health"
 if oc get crd nodenetworkconfigurationenactments.nmstate.io >/dev/null 2>&1; then

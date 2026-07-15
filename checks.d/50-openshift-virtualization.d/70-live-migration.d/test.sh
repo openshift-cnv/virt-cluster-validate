@@ -18,14 +18,13 @@
 NS="${VIRT_VALIDATE_NAMESPACE:-}"
 
 cleanup() {
-  [ -f migration.yaml ] && oc delete ${NS:+-n "$NS"} -f migration.yaml --ignore-not-found=true >/dev/null 2>&1 || true
-  [ -f vm.yaml ] && oc delete ${NS:+-n "$NS"} -f vm.yaml --ignore-not-found=true >/dev/null 2>&1 || true
+  [ -f migration.yaml ] && oc delete ${NS:+-n "$NS"} -f migration.yaml --ignore-not-found=true --force --grace-period=0 >/dev/null 2>&1 || true
+  [ -f vm.yaml ] && oc delete ${NS:+-n "$NS"} -f vm.yaml --ignore-not-found=true --force --grace-period=0 >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 oc auth can-i create virtualmachineinstancemigrations.kubevirt.io || {
-  pass_with info "No permission to perform live migration. This is ok since 4.19+"
-  exit 0
+  fail_with Permissions "No permission to perform live migration"
 }
 
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
@@ -48,7 +47,13 @@ spec:
   vmiName: ${VMNAME}
 status: {}
 EOF
-oc apply ${NS:+-n "$NS"} -f migration.yaml
+APPLY_OUT=$(oc apply ${NS:+-n "$NS"} -f migration.yaml 2>&1) || {
+  if echo "$APPLY_OUT" | grep -q "DisksNotLiveMigratable"; then
+    fail_with Migration "VM disks are not live-migratable (PVCs must use ReadWriteMany access mode)"
+  fi
+  echo "$APPLY_OUT"
+  fail_with Migration "Failed to create migration: $APPLY_OUT"
+}
 
 oc wait ${NS:+-n "$NS"} --for=jsonpath='{.status.phase}'=Succeeded --timeout=2m -f migration.yaml \
 || {

@@ -16,10 +16,10 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 oc get namespace openshift-adp >/dev/null 2>&1 \
-  || { pass_with info "OADP not installed (no openshift-adp namespace), skipping backup checks"; exit 0; }
+  || { skip_with "OADP not installed (no openshift-adp namespace), skipping backup checks"; }
 
 step "OADP Operator"
 CSV_PHASE=$(oc get csv -n openshift-adp -o json 2>/dev/null \

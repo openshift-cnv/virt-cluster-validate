@@ -16,7 +16,7 @@
 #
 
 oc get namespace openshift-sriov-network-operator >/dev/null 2>&1 \
-  || { pass_with info "SR-IOV Network Operator not installed, skipping"; exit 0; }
+  || { skip_with "SR-IOV Network Operator not installed, skipping"; }
 
 step "CSV Health"
 CSV_PHASE=$(oc get csv -n openshift-sriov-network-operator -o json 2>/dev/null \
@@ -26,7 +26,7 @@ CSV_PHASE=$(oc get csv -n openshift-sriov-network-operator -o json 2>/dev/null \
 
 step "Network Node Policies"
 oc get sriovnetworknodepolicies.sriovnetwork.openshift.io -n openshift-sriov-network-operator -o json > policies.json 2>/dev/null \
-  || { pass_with info "No SriovNetworkNodePolicy resources found"; exit 0; }
+  || { skip_with "No SriovNetworkNodePolicy resources found"; }
 
 INVALID_VFS=$(cat policies.json | jq -r '
   [.items[]

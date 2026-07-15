@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 #
-# Copyright (C) 2024-2026 Red Hat, Inc.
+# Copyright (C) 2026 Red Hat, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,5 +15,12 @@
 # limitations under the License.
 #
 
-oc get crd nodenetworkconfigurationpolicies.nmstate.io >/dev/null 2>&1 \
-|| { fail_with nmstate "nmstate operator is not installed. Host network configuration will not be available."; }
+MESSAGE="SKIP: $*"
+echo "$MESSAGE"
+
+if [ -n "$TEST_REPORT_FD" ]; then
+    export _REPORT_MSG="$MESSAGE"
+    eval "echo \"\$_REPORT_MSG\" >&${TEST_REPORT_FD}"
+fi
+
+exit 77

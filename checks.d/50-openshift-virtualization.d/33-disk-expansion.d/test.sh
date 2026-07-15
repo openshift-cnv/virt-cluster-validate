@@ -16,11 +16,11 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 step "DataVolume Expansion"
 oc get crd datavolumes.cdi.kubevirt.io >/dev/null 2>&1 \
-  || { pass_with info "CDI not installed, skipping disk expansion check"; exit 0; }
+  || { skip_with "CDI not installed, skipping disk expansion check"; }
 
 DV_STUCK=$(oc_cached dvs get dv -A -o json 2>/dev/null | jq -r '
   [.items[]

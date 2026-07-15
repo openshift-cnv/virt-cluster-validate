@@ -16,7 +16,7 @@
 #
 
 oc get mcp -o json > mcp.json 2>/dev/null \
-  || { pass_with info "MachineConfigPool API not available"; exit 0; }
+  || { skip_with "MachineConfigPool API not available"; }
 
 DEGRADED=$(cat mcp.json | jq -r '[.items[] | select(.status.conditions[]? | select(.type=="Degraded" and .status=="True"))] | .[].metadata.name')
 if [ -n "$DEGRADED" ]; then

@@ -19,7 +19,7 @@
 NODES=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)
 
 if [ -z "$NODES" ]; then
-  exit 0
+  skip_with "No worker nodes found"
 fi
 
 # Use the must-gather namespace if available, otherwise detect from context
@@ -110,5 +110,3 @@ WARNINGS=$(ls -1q "$TMP_DIR"/*.warn 2>/dev/null | wc -l)
 if [ "$WARNINGS" -gt 0 ]; then
   pass_with warn C0_State "Found $WARNINGS worker node(s) where CPUs are not forced to C0 state via sysfs."
 fi
-
-exit 0

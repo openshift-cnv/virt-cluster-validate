@@ -18,18 +18,24 @@
 NS="${VIRT_VALIDATE_NAMESPACE:-}"
 
 cleanup() {
-  [ -f restore.yaml ] && oc delete ${NS:+-n "$NS"} -f restore.yaml --ignore-not-found=true >/dev/null 2>&1 || true
-  [ -f snap.yaml ] && oc delete ${NS:+-n "$NS"} -f snap.yaml --ignore-not-found=true >/dev/null 2>&1 || true
-  [ -f vm.yaml ] && oc delete ${NS:+-n "$NS"} -f vm.yaml --ignore-not-found=true >/dev/null 2>&1 || true
+  [ -f restore.yaml ] && oc delete ${NS:+-n "$NS"} -f restore.yaml --ignore-not-found=true --force --grace-period=0 >/dev/null 2>&1 || true
+  [ -f snap.yaml ] && oc delete ${NS:+-n "$NS"} -f snap.yaml --ignore-not-found=true --force --grace-period=0 >/dev/null 2>&1 || true
+  [ -f vm.yaml ] && oc delete ${NS:+-n "$NS"} -f vm.yaml --ignore-not-found=true --force --grace-period=0 >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
+
+VSC_COUNT=$(oc get volumesnapshotclass -o json 2>/dev/null | jq '.items | length' 2>/dev/null || echo 0)
+if [ "$VSC_COUNT" -eq 0 ]; then
+  fail_with VolumeSnapshotClass "No VolumeSnapshotClass found, snapshot operations will not work"
+fi
 
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
 oc create ${NS:+-n "$NS"} -f vm.yaml
 
 VMNAME=$(oc get ${NS:+-n "$NS"} -o jsonpath='{.metadata.name}' -f vm.yaml)
 
-virtctl stop ${NS:+-n "$NS"} $VMNAME
+oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout=2m -f vm.yaml
+virtctl stop ${NS:+-n "$NS"} "$VMNAME"
 
 tee snap.yaml <<EOF
 apiVersion: snapshot.kubevirt.io/v1alpha1
