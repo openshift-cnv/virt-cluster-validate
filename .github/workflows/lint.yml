@@ -39,6 +39,16 @@ jobs:
             bin/entrypoint.sh bin/download-tools.sh \
             collection-scripts/gather
 
+  license-headers:
+    name: License Headers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v6
+
+      - name: Check license headers
+        run: ./hack/check-license-headers.sh
+
   python:
     name: Python
     runs-on: ubuntu-latest
