@@ -16,11 +16,11 @@
 #
 
 oc get pv -o json > pv.json 2>/dev/null \
-  || { pass_with info "Unable to list PersistentVolumes (may lack permissions)"; exit 0; }
+  || { skip_with "Unable to list PersistentVolumes (may lack permissions)"; }
 
 PV_COUNT=$(cat pv.json | jq '.items | length')
 [[ "$PV_COUNT" -gt 0 ]] \
-  || { pass_with info "No PersistentVolumes found"; exit 0; }
+  || { skip_with "No PersistentVolumes found"; }
 
 UNHEALTHY=$(cat pv.json | jq -r '
   [.items[]

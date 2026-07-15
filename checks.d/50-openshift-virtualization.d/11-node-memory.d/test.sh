@@ -16,7 +16,7 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 oc_cached nodes get nodes -o json > nodes.json \
   || fail_with "Unable to get nodes"

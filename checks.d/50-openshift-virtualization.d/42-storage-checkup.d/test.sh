@@ -16,7 +16,7 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 step "PVC Health"
 PENDING_PVCS=$(oc_cached pvcs get pvc -A -o json 2>/dev/null | jq -r '

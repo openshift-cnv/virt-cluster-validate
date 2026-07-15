@@ -186,6 +186,7 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180):
             process.wait()
             duration = time.monotonic() - start_ts
             
+            skipped = False
             if timed_out[0]:
                 ts_line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] TIMEOUT: Test exceeded {timeout_secs} seconds and was killed."
                 log_lines.append(ts_line)
@@ -194,15 +195,17 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180):
                 success = False
             else:
                 success = process.returncode == 0
-            
+                skipped = process.returncode == 77
+
             report_f.seek(0)
             report_messages = report_f.read().decode('utf-8').splitlines()
-    
+
     has_warnings = any(msg.startswith("WARN:") for msg in report_messages)
 
     return {
         "testpath": str(test_file),
-        "success": success,
+        "success": success or skipped,
+        "skipped": skipped,
         "has_warnings": has_warnings,
         "cancelled": timed_out[0],
         "duration": duration,
@@ -223,6 +226,8 @@ def execute_task(test_file, env, ui, stream_output, timeout_secs, mock):
     
     if result.get("cancelled"):
         status_str = f"[{Colors.YELLOW}----{Colors.NC}]"
+    elif result.get("skipped"):
+        status_str = f"[{Colors.YELLOW}SKIP{Colors.NC}]"
     elif not result["success"]:
         status_str = f"[{Colors.RED}FAIL{Colors.NC}]"
     elif result.get("has_warnings"):
@@ -355,11 +360,12 @@ def main():
                 f.write("\n".join(r["log"]))
 
     # Unified Summary Calculation
-    passed = sum(1 for r in results if r["success"] and not r.get("has_warnings"))
-    warnings = sum(1 for r in results if r["success"] and r.get("has_warnings"))
+    skipped_by_test = sum(1 for r in results if r.get("skipped"))
+    passed = sum(1 for r in results if r["success"] and not r.get("has_warnings") and not r.get("skipped"))
+    warnings = sum(1 for r in results if r["success"] and r.get("has_warnings") and not r.get("skipped"))
     cancelled = sum(1 for r in results if r.get("cancelled"))
-    failed = len(results) - passed - warnings - cancelled
-    skipped = len(test_files) - len(results)
+    failed = len(results) - passed - warnings - cancelled - skipped_by_test
+    skipped = len(test_files) - len(results) + skipped_by_test
     
     summary = f"Passed: {passed}"
     if warnings > 0: summary += f", Warned: {warnings}"
@@ -378,6 +384,8 @@ def main():
         executed_paths = {r["testpath"] for r in results}
 
         def ctrf_status(r):
+            if r.get("skipped"):
+                return "skipped"
             if r["success"]:
                 return "passed"
             return "failed"

@@ -16,10 +16,10 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 HCO=$(oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o json 2>/dev/null) \
-  || { pass_with info "HyperConverged CR not found"; exit 0; }
+  || { skip_with "HyperConverged CR not found"; }
 
 OVERCOMMIT=$(echo "$HCO" | jq -r '.spec.resourceRequirements.memoryOvercommitPercentage // 100')
 

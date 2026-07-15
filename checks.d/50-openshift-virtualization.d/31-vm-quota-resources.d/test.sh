@@ -16,13 +16,13 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 VM_NAMESPACES=$(oc_cached vms get vm -A -o json 2>/dev/null \
   | jq -r '[.items[].metadata.namespace] | unique | .[]' 2>/dev/null)
 
 [[ -n "$VM_NAMESPACES" ]] \
-  || { pass_with info "No VMs found on the cluster"; exit 0; }
+  || { skip_with "No VMs found on the cluster"; }
 
 UNPROTECTED=""
 for NS in $VM_NAMESPACES; do

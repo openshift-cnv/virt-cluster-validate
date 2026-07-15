@@ -16,11 +16,11 @@
 #
 
 oc get machinesets -n openshift-machine-api -o json > ms.json 2>/dev/null \
-  || { pass_with info "MachineSet API not available (hosted control plane or SNO?)"; exit 0; }
+  || { skip_with "MachineSet API not available (hosted control plane or SNO?)"; }
 
 MS_COUNT=$(cat ms.json | jq '.items | length')
 [[ "$MS_COUNT" -gt 0 ]] \
-  || { pass_with info "No MachineSets found"; exit 0; }
+  || { skip_with "No MachineSets found"; }
 
 MISMATCHED=$(cat ms.json | jq -r '
   [.items[]

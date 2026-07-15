@@ -16,7 +16,7 @@
 #
 
 oc get namespace openshift-cnv >/dev/null 2>&1 \
-  || { pass_with info "OpenShift Virtualization not installed, skipping"; exit 0; }
+  || { skip_with "OpenShift Virtualization not installed, skipping"; }
 
 oc_cached nodes get nodes -o json > nodes.json \
   || fail_with "Unable to get nodes"
@@ -25,7 +25,7 @@ SCHED_NODES=$(cat nodes.json | jq '[.items[] | select(.metadata.labels["kubevirt
 NODE_COUNT=$(echo "$SCHED_NODES" | jq 'length')
 
 [[ "$NODE_COUNT" -gt 1 ]] \
-  || { pass_with info "Single schedulable node, migration headroom N/A"; exit 0; }
+  || { skip_with "Single schedulable node, migration headroom N/A"; }
 
 CLUSTER_EVICTION=$(oc get kubevirt kubevirt -n openshift-cnv -o json 2>/dev/null \
   | jq -r '.spec.configuration.evictionStrategy // empty' 2>/dev/null)

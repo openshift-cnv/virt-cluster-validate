@@ -32,10 +32,39 @@ jobs:
         run: |
           find checks.d -name '*.sh' -print0 | xargs -0 shellcheck -s bash -S warning -e SC1091,SC2034
 
+      - name: Check for direct exit calls in check scripts
+        run: |
+          fail=0
+          while IFS= read -r -d '' file; do
+            # awk: skip heredoc blocks, then flag any 'exit' call
+            matches=$(awk '
+              /<<[A-Za-z_]+/ {
+                marker = $NF
+                gsub(/[^A-Za-z_]/, "", marker)
+                in_heredoc = 1
+                next
+              }
+              in_heredoc && $0 ~ "^" marker "$" { in_heredoc = 0; next }
+              in_heredoc { next }
+              /\<exit[[:space:]]+[0-9]/ { print NR ": " $0 }
+            ' "$file")
+            if [ -n "$matches" ]; then
+              echo "ERROR: Direct exit in $file (use fail_with/skip_with instead):"
+              echo "$matches"
+              fail=1
+            fi
+          done < <(find checks.d -name '*.sh' -print0)
+          if [ "$fail" -eq 1 ]; then
+            echo ""
+            echo "Check scripts must not call exit directly."
+            echo "Use: fail_with (failure), skip_with (skip), or fall through (pass)."
+            exit 1
+          fi
+
       - name: Run shellcheck on bin helpers and gather
         run: |
           shellcheck -s bash -S warning -e SC1091 \
-            bin/fail_with bin/pass_with bin/step bin/summarize_results bin/oc_cached \
+            bin/fail_with bin/pass_with bin/skip_with bin/step bin/summarize_results bin/oc_cached \
             bin/entrypoint.sh bin/download-tools.sh \
             collection-scripts/gather
 

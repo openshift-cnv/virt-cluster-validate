@@ -16,7 +16,7 @@
 #
 
 oc api-resources --no-headers 2>/dev/null | grep -q apirequestcounts \
-  || { pass_with info "APIRequestCount resource not available"; exit 0; }
+  || { skip_with "APIRequestCount resource not available"; }
 
 oc get apirequestcounts -o json > arc.json \
   || fail_with "Unable to get APIRequestCounts"

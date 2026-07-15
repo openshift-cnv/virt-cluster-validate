@@ -16,7 +16,7 @@
 #
 
 oc get namespace openshift-monitoring >/dev/null 2>&1 \
-  || { pass_with info "openshift-monitoring namespace not found"; exit 0; }
+  || { skip_with "openshift-monitoring namespace not found"; }
 
 oc get pods -n openshift-monitoring -o json > pods.json \
   || fail_with "Unable to get monitoring pods"
