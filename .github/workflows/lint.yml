@@ -61,6 +61,46 @@ jobs:
             exit 1
           fi
 
+      - name: Check for unhandled oc/virtctl commands in check scripts
+        run: |
+          fail=0
+          while IFS= read -r -d '' file; do
+            # awk: skip heredoc blocks and cleanup traps, then flag oc/virtctl
+            # commands that could fail without a fail_with/skip_with message
+            matches=$(awk '
+              /<<[A-Za-z_]+/ {
+                marker = $NF
+                gsub(/[^A-Za-z_]/, "", marker)
+                in_heredoc = 1
+                next
+              }
+              in_heredoc && $0 ~ "^" marker "$" { in_heredoc = 0; next }
+              in_heredoc { next }
+              /^\s*#/ { next }
+              /cleanup\(\)/ { in_cleanup = 1 }
+              in_cleanup && /^\}/ { in_cleanup = 0; next }
+              in_cleanup { next }
+              /\$\(/ { next }
+              /(oc (create|apply|delete|wait|patch)|virtctl (create|stop|start))/ {
+                if (/\|\|/ || /&&/ || /\\$/) next
+                if (/--ignore-not-found/) next
+                if (/\| tee/) next
+                print NR ": " $0
+              }
+            ' "$file")
+            if [ -n "$matches" ]; then
+              echo "ERROR: Unhandled command in $file (add || fail_with):"
+              echo "$matches"
+              fail=1
+            fi
+          done < <(find checks.d -name '*.sh' -print0)
+          if [ "$fail" -eq 1 ]; then
+            echo ""
+            echo "oc/virtctl commands must have error handling (|| fail_with/skip_with)."
+            echo "The runner uses bash -xe, so unhandled failures exit silently."
+            exit 1
+          fi
+
       - name: Run shellcheck on bin helpers and gather
         run: |
           shellcheck -s bash -S warning -e SC1091 \

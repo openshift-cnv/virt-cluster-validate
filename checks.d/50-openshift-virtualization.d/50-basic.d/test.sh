@@ -23,11 +23,12 @@ cleanup() {
 trap cleanup EXIT
 
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
-oc create ${NS:+-n "$NS"} -f vm.yaml
+oc create ${NS:+-n "$NS"} -f vm.yaml \
+  || fail_with Setup "Failed to create test VM"
 
 oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout=2m -f vm.yaml \
 || {
   VMNAME=$(oc get ${NS:+-n "$NS"} -o jsonpath='{.metadata.name}' -f vm.yaml)
-  oc get ${NS:+-n "$NS"} -o yaml vm $VMNAME
-  fail_with Scheduling "Unable to schedule VMs?"
+  oc get ${NS:+-n "$NS"} -o yaml vm "$VMNAME"
+  fail_with Scheduling "Unable to schedule VMs"
 }
