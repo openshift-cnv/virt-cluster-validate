@@ -1,0 +1,54 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v6
+
+      - name: Run shellcheck on check scripts
+        run: |
+          find checks.d -name '*.sh' -print0 | xargs -0 shellcheck -s bash -S warning -e SC1091,SC2034
+
+      - name: Run shellcheck on bin helpers and gather
+        run: |
+          shellcheck -s bash -S warning -e SC1091 \
+            bin/fail_with bin/pass_with bin/step bin/summarize_results bin/oc_cached \
+            bin/entrypoint.sh bin/download-tools.sh \
+            collection-scripts/gather
+
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check syntax
+        run: python3 -m py_compile virt-cluster-validate
+
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests -v
+
+  container:
+    name: Container Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v6
+
+      - name: Build container image
+        run: podman build -t virt-cluster-validate:test .

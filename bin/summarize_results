@@ -5,17 +5,17 @@ set -e
 RESULTSD="$1"
 OPWD="$PWD"
 
-cd $RESULTSD
+cd "$RESULTSD"
 
-find *.d/*.d/ -type d | sort -h | while read TESTDIR; do
+find ./*.d/*.d/ -type d | sort -h | while read -r TESTDIR; do
   RELTESTDIR=$(realpath -s --relative-to="$OPWD" "$TESTDIR")
 
   # Preints <PASS|FAIL> <PATH>
-  echo $(readlink $TESTDIR/result) $TESTDIR
+  echo "$(readlink "$TESTDIR/result") $TESTDIR"
 
   HAD_DETAILS=false
   for C in FAIL INFO WARN; do
-    [[ -f $TESTDIR/$C ]] && { sed "s/^/     /" $TESTDIR/$C ; HAD_DETAILS=true ; } ;
+    [[ -f "$TESTDIR/$C" ]] && { sed "s/^/     /" "$TESTDIR/$C" ; HAD_DETAILS=true ; } ;
   done
 
   if $HAD_DETAILS;

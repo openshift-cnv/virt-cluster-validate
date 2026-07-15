@@ -5,5 +5,5 @@ INFRA_INSTANCE_TYPES=$(oc_cached nodes get nodes -o json | jq -re '.items[] | .m
 
 case "$INFRA" in
   BareMetal|None) pass_with info Infrastructure "Platform '$INFRA'" ;;
-               *) fail_with Infrastructure "Platform '$INFRA' with instance type '$INFRA_INSTANCE_TYPE'. This does not look like it is bare metal." ;;
+               *) fail_with Infrastructure "Platform '$INFRA' with instance types '$INFRA_INSTANCE_TYPES'. This does not look like it is bare metal." ;;
 esac
