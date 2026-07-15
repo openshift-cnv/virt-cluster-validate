@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/ubi9/python-311:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 USER 0
 
-# Install required tools - oc and virtctl will be downloaded at runtime from the cluster
-RUN dnf install -y jq && dnf clean all
+# Install Python 3.11 and required tools
+RUN microdnf update -y && \
+    microdnf install -y python3.11 jq tar gzip rsync which util-linux-core && \
+    microdnf clean all && \
+    ln -s /usr/bin/python3.11 /usr/bin/python3
 
 # Make /usr/local/bin writable so tools can be downloaded at runtime
 RUN chmod 777 /usr/local/bin
