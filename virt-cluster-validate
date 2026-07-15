@@ -200,6 +200,14 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180):
             report_f.seek(0)
             report_messages = report_f.read().decode('utf-8').splitlines()
 
+            if not success and not skipped and not report_messages:
+                if timed_out[0]:
+                    report_messages = [f"FAIL: Test exceeded {timeout_secs}s timeout and was killed"]
+                else:
+                    last_lines = [l.split("] ", 1)[-1] for l in log_lines[-3:] if "] +" not in l]
+                    hint = last_lines[-1] if last_lines else f"exit code {process.returncode}"
+                    report_messages = [f"FAIL: {hint}"]
+
     has_warnings = any(msg.startswith("WARN:") for msg in report_messages)
 
     return {
