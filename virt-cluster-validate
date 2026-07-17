@@ -312,6 +312,169 @@ def print_details(results, verbose, skip_log_print=False):
                 print("    --- Test Output ---")
                 for line in r["log"]: print(f"    {line}")
 
+def check_ai_tool_setup(tool_name, command):
+    """Verify AI tool is properly configured by sending a test query."""
+    try:
+        proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True)
+        stdout, stderr = proc.communicate(input="Respond with just 'OK' if you can read this.", timeout=10)
+
+        if proc.returncode != 0:
+            print(f"{Colors.YELLOW}{tool_name} CLI found but returned an error. Is it configured?{Colors.NC}")
+            if stderr:
+                print(f"Error: {stderr.strip()[:200]}")
+            return False
+        return True
+
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        print(f"{Colors.YELLOW}{tool_name} CLI test timed out. Tool may not be properly configured.{Colors.NC}")
+        return False
+    except Exception as e:
+        print(f"{Colors.YELLOW}{tool_name} CLI test failed: {e}{Colors.NC}")
+        return False
+
+def get_test_status(result):
+    """Determine human-readable status from test result."""
+    if result.get("cancelled"):
+        return "CANCELLED (Timeout)"
+    elif not result["success"]:
+        return "FAILED"
+    elif result.get("has_warnings"):
+        return "WARNED"
+    elif result.get("skipped"):
+        return "SKIPPED"
+    return "PASSED"
+
+def find_ai_tool():
+    """Find and validate an available AI CLI tool (claude or gemini)."""
+    for tool_name, command in [("Claude", ["claude"]), ("Gemini", ["gemini", "chat"])]:
+        if shutil.which(command[0]) and check_ai_tool_setup(tool_name, command):
+            return tool_name, command
+
+    # None found or working
+    if not shutil.which("claude") and not shutil.which("gemini"):
+        print(f"\n{Colors.YELLOW}AI analysis skipped: neither 'claude' nor 'gemini' CLI found in PATH.{Colors.NC}")
+        print(f"Install Claude Code (https://claude.ai/code) or Gemini CLI to enable AI analysis.")
+    else:
+        print(f"\n{Colors.YELLOW}AI analysis skipped: found CLI tool(s) but none are properly configured.{Colors.NC}")
+    return None, None
+
+def build_analysis_document(results):
+    """Build self-contained analysis document with all test results."""
+    failed = sum(1 for r in results if not r["success"] and not r.get("cancelled"))
+    cancelled = sum(1 for r in results if r.get("cancelled"))
+    warned = sum(1 for r in results if r["success"] and r.get("has_warnings"))
+    passed = sum(1 for r in results if r["success"] and not r.get("has_warnings"))
+
+    lines = [
+        "=" * 80,
+        "OpenShift Cluster Validation - Complete Results",
+        "=" * 80,
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Total Checks: {len(results)}",
+        f"  - Failed: {failed}",
+        f"  - Cancelled (Timeout): {cancelled}",
+        f"  - Warned: {warned}",
+        f"  - Passed: {passed}",
+        "",
+        "=" * 80,
+        "ALL CHECKS - DETAILED INFORMATION",
+        "=" * 80,
+        "",
+    ]
+
+    for idx, r in enumerate(results, 1):
+        lines.extend([
+            f"[{idx}/{len(results)}] {r['testpath']}",
+            "-" * 80,
+            f"Status: {get_test_status(r)}",
+            f"Duration: {format_time(r['duration'])}",
+            "",
+        ])
+
+        if r["report_messages"]:
+            lines.append("Messages:")
+            lines.extend(f"  {msg}" for msg in r["report_messages"])
+            lines.append("")
+
+        if r["log"]:
+            lines.append("Complete Test Output:")
+            lines.extend(f"  {line}" for line in r["log"])
+        else:
+            lines.append("(No log output available)")
+
+        lines.extend(["", "=" * 80, ""])
+
+    lines.extend([
+        "",
+        "=" * 80,
+        "ANALYSIS REQUEST",
+        "=" * 80,
+        "",
+        "Based on the failed checks above, please provide a BRIEF analysis:",
+        "",
+        "1. ROOT CAUSE (2-3 sentences max)",
+        "   - What is wrong with this OpenShift cluster?",
+        "   - Common themes across failures?",
+        "",
+        "2. FIXES (bullet points, commands where applicable)",
+        "   - Specific remediation steps for each issue",
+        "   - Prioritized by impact",
+        "",
+        "IMPORTANT: Keep your response SHORT and ACTIONABLE, but do NOT SPECULATE, base suggestions on EVIDENCE.",
+        "Limit to essential information only - no lengthy explanations.",
+        "",
+        "=" * 80,
+    ])
+
+    return "\n".join(lines)
+
+def ask_ai_for_conclusion(results):
+    """Analyze failed checks using Claude or Gemini CLI."""
+    if not any(not r["success"] or r.get("cancelled") for r in results):
+        return
+
+    ai_tool, ai_command = find_ai_tool()
+    if not ai_tool:
+        return
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    analysis_file = f"ai-analysis-{timestamp}.txt"
+    print(f"\n{Colors.YELLOW}Preparing analysis file: {analysis_file}{Colors.NC}")
+
+    # Build and write analysis document
+    try:
+        analysis_content = build_analysis_document(results)
+        with open(analysis_file, "w") as f:
+            f.write(analysis_content)
+        print(f"{Colors.GREEN}Analysis file created: {analysis_file}{Colors.NC}")
+    except Exception as e:
+        print(f"{Colors.RED}Failed to create analysis file: {e}{Colors.NC}")
+        return
+
+    # Run AI analysis
+    print(f"{Colors.YELLOW}Analyzing with {ai_tool}...{Colors.NC}\n")
+    try:
+        with open(analysis_file, "r") as f:
+            proc = subprocess.Popen(ai_command, stdin=f, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, text=True)
+            stdout, stderr = proc.communicate(timeout=120)
+
+        if proc.returncode == 0:
+            print(f"{Colors.GREEN}=== AI Analysis ==={Colors.NC}")
+            print(stdout)
+        else:
+            print(f"{Colors.RED}AI analysis failed:{Colors.NC}")
+            print(stderr)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        print(f"{Colors.RED}AI analysis timed out after 120 seconds.{Colors.NC}")
+    except Exception as e:
+        print(f"{Colors.RED}Error running AI analysis: {e}{Colors.NC}")
+
+    print(f"\n{Colors.YELLOW}Analysis file saved as: {analysis_file}{Colors.NC}")
+
 def main():
     parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
     parser.add_argument("-o", "--output", choices=["human", "ctrf"], default="human", help="Output format (default: human)")
@@ -323,6 +486,7 @@ def main():
     parser.add_argument("--log-dir", metavar="DIR", help="Write per-check log files to this directory")
     parser.add_argument("-t", "--timeout", type=parse_timespan, default="180", metavar="SPAN", help="Timeout for each test (e.g. 3m, 45s, 180; default: 180)")
     parser.add_argument("-c", "--concurrency", type=int, default=os.cpu_count() or 4, metavar="N", help="Number of concurrent tests to run (default: CPU count)")
+    parser.add_argument("--ai-analysis", action="store_true", help="Analyze failures with AI (Claude Code or Gemini CLI)")
     args = parser.parse_args()
 
     # 1. Environment & Discovery
@@ -441,6 +605,10 @@ def main():
         # Suggest -v flag if there are failures/warnings and verbose is not set
         if args.verbose == 0 and (failed > 0 or warnings > 0):
             print(f"\n{Colors.YELLOW}Hint: Run with -v to see details of failed/warned checks{Colors.NC}")
+
+        # AI analysis of failures and timeouts (opt-in with --ai-analysis)
+        if args.ai_analysis and (failed > 0 or cancelled > 0):
+            ask_ai_for_conclusion(results)
     elif args.output == "ctrf":
         stop_epoch_ms = int(time.time() * 1000)
         executed_paths = {r["testpath"] for r in results}
