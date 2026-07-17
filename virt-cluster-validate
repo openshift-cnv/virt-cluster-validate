@@ -249,13 +249,20 @@ def execute_task(test_file, env, ui, stream_output, timeout_secs, mock):
 
 def print_details(results, verbose, skip_log_print=False):
     """Prints the expanded logs and reports for relevant tests."""
-    if not any(not r["success"] or r["report_messages"] for r in results) and not verbose:
+    if not verbose:
         return
 
     print(f"\n{'='*20} DETAILS {'='*20}")
     for r in results:
-        # We always want to show details if it failed, has warnings/info messages, or if verbose is true
-        if not r["success"] or r["report_messages"] or verbose:
+        # -v (verbose=1): show failed/warned checks only
+        # -vv (verbose>=2): show all checks
+        show_this_test = False
+        if verbose >= 2:
+            show_this_test = True
+        elif verbose == 1:
+            show_this_test = not r["success"] or r.get("has_warnings")
+
+        if show_this_test:
             if r.get("cancelled"):
                 status_block = "[----]"
             elif not r["success"]:
@@ -278,14 +285,14 @@ def print_details(results, verbose, skip_log_print=False):
                 print(f"    {c}-> {msg}{Colors.NC if c else ''}")
                 
             # Print the log output, UNLESS it was cancelled
-            if r["log"] and not r.get("cancelled") and (not r["success"] or r.get("has_warnings") or verbose) and not skip_log_print:
+            if r["log"] and not r.get("cancelled") and show_this_test and not skip_log_print:
                 print("    --- Test Output ---")
                 for line in r["log"]: print(f"    {line}")
 
 def main():
     parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
     parser.add_argument("-o", "--output", choices=["human", "ctrf"], default="human", help="Output format (default: human)")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Show test output in human-readable mode")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="Show test output: -v for failed/warned, -vv for all")
     parser.add_argument("-f", "--fail-fast", nargs="?", const=1, type=int, metavar="N", help="Stop execution after N failures")
     parser.add_argument("-s", "--select", metavar="PATH", help="Only run the specific test file provided (e.g. checks.d/10-openshift.d/10-nodes.d/test.sh)")
     parser.add_argument("--include", metavar="PATTERNS", help="Comma-separated substrings to match; only run tests whose path contains at least one pattern")
@@ -375,11 +382,11 @@ def main():
     failed = len(results) - passed - warnings - cancelled - skipped_by_test
     skipped = len(test_files) - len(results) + skipped_by_test
     
-    summary = f"Passed: {passed}"
-    if warnings > 0: summary += f", Warned: {warnings}"
-    summary += f", Failed: {failed}"
-    if cancelled > 0: summary += f", Cancelled: {cancelled}"
-    if skipped > 0: summary += f", Skipped: {skipped}"
+    summary = f"{Colors.RED}Failed: {failed}{Colors.NC}"
+    if warnings > 0: summary += f", {Colors.YELLOW}Warned: {warnings}{Colors.NC}"
+    if cancelled > 0: summary += f", {Colors.YELLOW}Cancelled: {cancelled}{Colors.NC}"
+    if skipped > 0: summary += f", {Colors.YELLOW}Skipped: {skipped}{Colors.NC}"
+    summary += f", {Colors.GREEN}Passed: {passed}{Colors.NC}"
     summary += f", Total: {len(test_files)}"
     
     if args.output == "human":

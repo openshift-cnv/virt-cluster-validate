@@ -29,24 +29,19 @@ if [ -n "$FAILED_CSVS" ]; then
 fi
 
 step "HCO Conditions"
-HCO=$(oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o json 2>/dev/null) \
+oc get hyperconverged kubevirt-hyperconverged -n openshift-cnv -o json 2>/dev/null > hco.json \
   || fail_with "HyperConverged CR not found"
 
-HCO_DEGRADED=$(echo "$HCO" | jq -r '.status.conditions[]? | select(.type=="Degraded" and .status=="True") | .message')
-if [ -n "$HCO_DEGRADED" ]; then
-  fail_with "HyperConverged is Degraded: $HCO_DEGRADED"
-fi
+jq -er '.status.conditions[]? | select(.type=="Degraded" and .status=="True") | .message' hco.json && \
+  fail_with "HyperConverged is Degraded"
 
-HCO_AVAILABLE=$(echo "$HCO" | jq -r '.status.conditions[]? | select(.type=="Available") | .status')
-if [ "$HCO_AVAILABLE" != "True" ]; then
+jq -er '.status.conditions[]? | select(.type=="Available") | .status == true' hco.json || \
   pass_with warn "HyperConverged is not Available"
-fi
 
-HCO_UPGRADEABLE=$(echo "$HCO" | jq -r '.status.conditions[]? | select(.type=="Upgradeable") | .status')
-if [ "$HCO_UPGRADEABLE" == "False" ]; then
-  HCO_UPG_MSG=$(echo "$HCO" | jq -r '.status.conditions[]? | select(.type=="Upgradeable") | .message')
+jq -er '.status.conditions[]? | select(.type=="Upgradeable") | .status == true' || (
+  HCO_UPG_MSG=$(jq -r '.status.conditions[]? | select(.type=="Upgradeable") | .message' hco.json)
   pass_with warn "HyperConverged is not Upgradeable: $HCO_UPG_MSG"
-fi
+)
 
 step "ClusterVersion"
 CV_PROGRESSING=$(oc get clusterversion version -o json 2>/dev/null | jq -r '
