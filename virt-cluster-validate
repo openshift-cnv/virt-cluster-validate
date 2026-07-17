@@ -375,11 +375,11 @@ def main():
     failed = len(results) - passed - warnings - cancelled - skipped_by_test
     skipped = len(test_files) - len(results) + skipped_by_test
     
-    summary = f"Passed: {passed}"
-    if warnings > 0: summary += f", Warned: {warnings}"
-    summary += f", Failed: {failed}"
-    if cancelled > 0: summary += f", Cancelled: {cancelled}"
-    if skipped > 0: summary += f", Skipped: {skipped}"
+    summary = f"{Colors.GREEN}Passed: {passed}{Colors.NC}"
+    if warnings > 0: summary += f", {Colors.YELLOW}Warned: {warnings}{Colors.NC}"
+    summary += f", {Colors.RED}Failed: {failed}{Colors.NC}"
+    if cancelled > 0: summary += f", {Colors.YELLOW}Cancelled: {cancelled}{Colors.NC}"
+    if skipped > 0: summary += f", {Colors.YELLOW}Skipped: {skipped}{Colors.NC}"
     summary += f", Total: {len(test_files)}"
     
     if args.output == "human":
