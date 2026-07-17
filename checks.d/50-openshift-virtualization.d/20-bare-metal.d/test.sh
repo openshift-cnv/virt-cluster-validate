@@ -20,5 +20,6 @@ INFRA_INSTANCE_TYPES=$(oc_cached nodes get nodes -o json | jq -re '.items[] | .m
 
 case "$INFRA" in
   BareMetal|None) pass_with info Infrastructure "Platform '$INFRA'" ;;
+  AWS)            pass_with warn Infrastructure "Platform '$INFRA' with '$INFRA_INSTANCE_TYPES' could be metal, might not." ;;
                *) fail_with Infrastructure "Platform '$INFRA' with instance types '$INFRA_INSTANCE_TYPES'. This does not look like it is bare metal." ;;
 esac
