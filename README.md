@@ -119,6 +119,16 @@ The must-gather archive will contain:
 
 The `ctrf-results.json` file follows the [CTRF (Common Test Report Format)](https://ctrf.io) specification and can be consumed by any CTRF-compatible tooling.
 
+## Prerequisites
+
+The validator includes a global prerequisite check at `checks.d/prerequisite.sh`:
+
+1. It runs **before** any tests execute
+2. If it fails, the entire test suite is aborted with exit code 2
+3. The prerequisite output is always displayed (regardless of `-v` flags)
+
+By default, it verifies cluster connectivity (`oc whoami`). You can customize this file to add additional checks like required operator installations, minimum cluster versions, or permissions validation.
+
 ## Development & Testing
 
 ### Unit Tests
