@@ -17,8 +17,9 @@
 
 if oc api-resources | grep machinehealthcheck
 then pass_with info Remediation "Node remediation is provided by MachineHealthChecks"
-# FIXME need to check if it's really this resource to look for
-#elif oc api-resources | grep nodehealthcheck
-#then pass_with_info Remediation "Node remediation is provided by NodeHealthChecks"
+
+elif oc get crd nodehealthchecks.remediation.medik8s.io
+then pass_with Info Remediation "Node remediation is provided by NodeHealthChecks"
+
 else fail_with Remediation "No node remediation found. Either use IPI or install a fencing solution like NHC with SNR."
 fi
