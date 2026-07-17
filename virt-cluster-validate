@@ -298,9 +298,17 @@ def print_details(results, verbose, skip_log_print=False):
                 else:
                     c = ""
                 print(f"    {c}-> {msg}{Colors.NC if c else ''}")
-                
-            # Print the log output, UNLESS it was cancelled
-            if r["log"] and not r.get("cancelled") and show_this_test and not skip_log_print:
+
+            # Print the log output
+            # -v: show logs only for failed tests (not warnings)
+            # -vv: show logs for all displayed tests
+            show_logs = False
+            if verbose >= 2:
+                show_logs = True
+            elif verbose == 1:
+                show_logs = not r["success"]  # Only failures, not warnings
+
+            if r["log"] and not r.get("cancelled") and show_logs and not skip_log_print:
                 print("    --- Test Output ---")
                 for line in r["log"]: print(f"    {line}")
 
