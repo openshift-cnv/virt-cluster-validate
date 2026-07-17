@@ -322,8 +322,31 @@ def main():
     env = {**os.environ,
            "PATH": f"{os.path.abspath('bin')}{os.pathsep}{os.environ.get('PATH', '')}",
            "VIRT_VALIDATE_CACHE_DIR": cache_dir}
+
+    is_mock = os.environ.get("VIRT_VALIDATE_MOCK") == "1"
+
+    # Check for global prerequisite
+    prerequisite_file = Path("checks.d/prerequisite.sh")
+    if prerequisite_file.exists():
+        print(f"{Colors.YELLOW}Running Prerequisite...{Colors.NC}")
+        prereq_result = run_test(prerequisite_file, env, stream_output=False, timeout_secs=args.timeout) if not is_mock else simulate_test(prerequisite_file, stream_output=False, timeout_secs=args.timeout)
+
+        if prereq_result["success"]:
+            print(f"{Colors.GREEN}[PASS]{Colors.NC} {format_time(prereq_result['duration'])} {prerequisite_file}")
+            print()
+        else:
+            print(f"{Colors.RED}[FAIL]{Colors.NC} {format_time(prereq_result['duration'])} {prerequisite_file}")
+            print(f"\n{Colors.RED}PREREQUISITE FAILURE: Cannot proceed with tests.{Colors.NC}")
+            for msg in prereq_result["report_messages"]:
+                print(f"    -> {msg}")
+            if prereq_result["log"]:
+                print("    --- Prerequisite Output ---")
+                for line in prereq_result["log"]:
+                    print(f"    {line}")
+            sys.exit(2)
+
     test_files = sorted(Path("checks.d").rglob("test*.sh"))
-    
+
     if args.include:
         patterns = [p.strip() for p in args.include.split(",")]
         test_files = [t for t in test_files if any(p in str(t) for p in patterns)]
@@ -350,8 +373,6 @@ def main():
     failed_count_live = 0
     start_time = time.monotonic()
     start_epoch_ms = int(time.time() * 1000)
-    
-    is_mock = os.environ.get("VIRT_VALIDATE_MOCK") == "1"
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = {executor.submit(execute_task, t, env, ui, stream_output, args.timeout, is_mock): t for t in test_files}
