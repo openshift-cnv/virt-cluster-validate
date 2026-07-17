@@ -22,11 +22,14 @@ Validates an OpenShift cluster's virtualization readiness.
     # Login to the cluster
     oc login ...
 
-    # Basic run (Human readable)
+    # Basic run (Human readable, summary only)
     ./virt-cluster-validate
 
-    # Verbose run (Shows full logs)
+    # Show details of failed and warned checks
     ./virt-cluster-validate -v
+
+    # Show details of all checks (including passed)
+    ./virt-cluster-validate -vv
 
     # Run only specific checks (substring match)
     ./virt-cluster-validate --include nodes,basic
@@ -46,7 +49,7 @@ Validates an OpenShift cluster's virtualization readiness.
 ### CLI Options
 
 *   `-o {human,ctrf}`: Output format (Default: `human`). `ctrf` produces a [CTRF](https://ctrf.io) JSON report.
-*   `-v, --verbose`: Print full bash logs for every test.
+*   `-v, --verbose`: Show test details. Use `-v` for failed/warned checks only, `-vv` for all checks.
 *   `-s, --select PATH`: Run only a specific test script.
 *   `--include PATTERNS`: Comma-separated substrings; only run tests whose path contains at least one pattern (e.g. `--include nodes,basic`).
 *   `--exclude PATTERNS`: Comma-separated substrings; skip tests whose path contains any pattern (e.g. `--exclude high-performance,rebalance`).
