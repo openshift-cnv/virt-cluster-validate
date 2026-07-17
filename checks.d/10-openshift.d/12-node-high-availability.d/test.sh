@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 #
-# Copyright (C) 2024-2026 Red Hat, Inc.
+# Copyright (C) 2025-2026 Red Hat, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,14 +15,10 @@
 # limitations under the License.
 #
 
-step Connectivity
-oc whoami
-oc whoami --show-server
-oc cluster-info || fail_with "Unable to reach the cluster API"
-
-step Availability
-oc get namespace openshift-cnv >/dev/null 2>&1 \
-|| skip_with "OpenShift Virtualization does not seem to be present. Did you install the OpenShift Virtualization operator?"
-
-step Auth
-oc auth can-i list nodes || fail_with "You can not list nodes. Are you bound to the cluster-reader role? This is required by this tool."
+if oc api-resources | grep machinehealthcheck
+then pass_with info Remediation "Node remediation is provided by MachineHealthChecks"
+# FIXME need to check if it's really this resource to look for
+#elif oc api-resources | grep nodehealthcheck
+#then pass_with_info Remediation "Node remediation is provided by NodeHealthChecks"
+else fail_with Remediation "No node remediation found. Either use IPI or install a fencing solution like NHC with SNR."
+fi
