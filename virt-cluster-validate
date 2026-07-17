@@ -328,7 +328,6 @@ def main():
     # Check for global prerequisite
     prerequisite_file = Path("checks.d/prerequisite.sh")
     if prerequisite_file.exists():
-        print(f"{Colors.YELLOW}Running Prerequisite...{Colors.NC}")
         prereq_result = run_test(prerequisite_file, env, stream_output=False, timeout_secs=args.timeout) if not is_mock else simulate_test(prerequisite_file, stream_output=False, timeout_secs=args.timeout)
 
         if prereq_result["success"]:
@@ -430,6 +429,10 @@ def main():
         print("-" * 40)
         print(summary)
         print(f"Total time: {format_time(time.monotonic() - start_time)}")
+
+        # Suggest -v flag if there are failures/warnings and verbose is not set
+        if args.verbose == 0 and (failed > 0 or warnings > 0):
+            print(f"\n{Colors.YELLOW}Hint: Run with -v to see details of failed/warned checks{Colors.NC}")
     elif args.output == "ctrf":
         stop_epoch_ms = int(time.time() * 1000)
         executed_paths = {r["testpath"] for r in results}
