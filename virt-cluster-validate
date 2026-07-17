@@ -249,13 +249,13 @@ def execute_task(test_file, env, ui, stream_output, timeout_secs, mock):
 
 def print_details(results, verbose, skip_log_print=False):
     """Prints the expanded logs and reports for relevant tests."""
-    if not any(not r["success"] or r["report_messages"] for r in results) and not verbose:
+    if not verbose:
         return
 
     print(f"\n{'='*20} DETAILS {'='*20}")
     for r in results:
-        # We always want to show details if it failed, has warnings/info messages, or if verbose is true
-        if not r["success"] or r["report_messages"] or verbose:
+        # Only show details when verbose is true
+        if verbose:
             if r.get("cancelled"):
                 status_block = "[----]"
             elif not r["success"]:
