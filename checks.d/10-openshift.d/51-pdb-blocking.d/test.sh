@@ -28,6 +28,6 @@ BLOCKING=$(cat pdb.json | jq -r '
 
 if [ -n "$BLOCKING" ]; then
   pass_with warn "PDBs blocking disruptions (disruptionsAllowed=0): $BLOCKING"
+else
+  pass_with info "No PDBs are currently blocking disruptions"
 fi
-
-pass_with info "No PDBs are currently blocking disruptions"

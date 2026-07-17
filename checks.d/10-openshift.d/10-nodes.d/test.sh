@@ -27,4 +27,4 @@ then pass_with info Topology "Looks like a regular cluster."
 else fail_with Topology "Unknown topology. Any nodes at all?"
 fi
 
-[[ "$WORKER_NODE_COUNT" -gt 100 ]] && pass_with warn Size "Found $WORKER_NODE_COUNT workers, which are more than recommended (100)."
+[[ "$WORKER_NODE_COUNT" -gt 100 ]] && pass_with warn Size "Found $WORKER_NODE_COUNT workers, which are more than recommended (100)." || :

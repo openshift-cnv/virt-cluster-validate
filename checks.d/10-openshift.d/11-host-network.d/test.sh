@@ -15,5 +15,5 @@
 # limitations under the License.
 #
 
-oc get crd nodenetworkconfigurationpolicies.nmstate.io >/dev/null 2>&1 \
+oc get crd nmstates.nmstate.io >/dev/null 2>&1 \
 || { fail_with nmstate "nmstate operator is not installed. Host network configuration will not be available."; }
