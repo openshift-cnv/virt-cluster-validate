@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-import os, sys, json, argparse, tempfile, time, threading, subprocess, signal, random
+import os, sys, json, argparse, tempfile, time, threading, subprocess, signal, random, shutil
 from datetime import datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -46,28 +46,43 @@ class TerminalUI:
         self.total = len(test_files)
         self.line_map = {str(t): i for i, t in enumerate(test_files)}
         self.lock = threading.Lock()
+        self.term_width = shutil.get_terminal_size((80, 24)).columns
+
+    def _truncate(self, text, max_len):
+        """Truncate text to fit within max_len, adding ellipsis if needed."""
+        if len(text) <= max_len:
+            return text
+        return text[:max_len-3] + "..."
 
     def init_display(self, test_files):
         if not self.is_tty: return
+        # Reserve space for "[WARN] MM:SS " prefix (16 chars)
+        path_max = self.term_width - 16
         for t in test_files:
-            print(f"[    ] --:-- {t}")
+            truncated = self._truncate(str(t), path_max)
+            print(f"[    ] --:-- {truncated}")
         print() # Space for progress bar
         sys.stdout.flush()
 
     def update_test(self, test_path, status, duration="--:--"):
         if not self.is_tty: return
         lines_up = (self.total - self.line_map[test_path]) + 1
+        # Reserve space for status and duration
+        path_max = self.term_width - 16
+        truncated = self._truncate(test_path, path_max)
         with self.lock:
             # Move up, clear line, write status, move back down
-            print(f"\033[{lines_up}A\r\033[K{status} {duration} {test_path}\033[{lines_up}B", end="", flush=True)
+            print(f"\033[{lines_up}A\r\033[K{status} {duration} {truncated}\033[{lines_up}B", end="", flush=True)
 
     def update_progress(self, completed, elapsed):
         if not self.is_tty: return
         pct = int((completed / self.total) * 100) if self.total else 100
         fill = int(20 * completed // self.total) if self.total else 20
         bar = '#' * fill + '-' * (20 - fill)
+        progress_line = f"Progress: [{bar}] {pct}% ({completed}/{self.total}) | {format_time(elapsed)}"
+        truncated = self._truncate(progress_line, self.term_width)
         with self.lock:
-            print(f"\r\033[KProgress: [{bar}] {pct}% ({completed}/{self.total}) | {format_time(elapsed)}", end="", flush=True)
+            print(f"\r\033[K{truncated}", end="", flush=True)
 
     def clear_progress(self):
         if not self.is_tty: return
