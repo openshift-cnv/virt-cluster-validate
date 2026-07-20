@@ -360,7 +360,7 @@ def find_ai_tool():
         print(f"\n{Colors.YELLOW}AI analysis skipped: found CLI tool(s) but none are properly configured.{Colors.NC}")
     return None, None
 
-def build_analysis_document(results):
+def build_analysis_document(results, timeout_seconds):
     """Build self-contained analysis document with all test results."""
     failed = sum(1 for r in results if not r["success"] and not r.get("cancelled"))
     cancelled = sum(1 for r in results if r.get("cancelled"))
@@ -377,6 +377,9 @@ def build_analysis_document(results):
         f"  - Cancelled (Timeout): {cancelled}",
         f"  - Warned: {warned}",
         f"  - Passed: {passed}",
+        "",
+        f"NOTE: Test timeout was configured to {timeout_seconds} seconds per test.",
+        f"      Tests marked as CANCELLED exceeded this timeout limit.",
         "",
         "=" * 80,
         "ALL CHECKS - DETAILED INFORMATION",
@@ -422,7 +425,10 @@ def build_analysis_document(results):
         "   - Specific remediation steps for each issue",
         "   - Prioritized by impact",
         "",
-        "IMPORTANT: Keep your response SHORT and ACTIONABLE, but do NOT SPECULATE, base suggestions on EVIDENCE.",
+        "IMPORTANT: Keep your response SHORT and ACTIONABLE, but do NOT "
+        "SPECULATE, base suggestions on EVIDENCE. ALWAYS reference the log file ",
+        "you used.",
+        "",
         "Limit to essential information only - no lengthy explanations.",
         "",
         "=" * 80,
@@ -430,7 +436,7 @@ def build_analysis_document(results):
 
     return "\n".join(lines)
 
-def ask_ai_for_conclusion(results):
+def ask_ai_for_conclusion(results, timeout_seconds):
     """Analyze failed checks using Claude or Gemini CLI."""
     if not any(not r["success"] or r.get("cancelled") for r in results):
         return
@@ -445,7 +451,7 @@ def ask_ai_for_conclusion(results):
 
     # Build and write analysis document
     try:
-        analysis_content = build_analysis_document(results)
+        analysis_content = build_analysis_document(results, timeout_seconds)
         with open(analysis_file, "w") as f:
             f.write(analysis_content)
         print(f"{Colors.GREEN}Analysis file created: {analysis_file}{Colors.NC}")
@@ -608,7 +614,7 @@ def main():
 
         # AI analysis of failures and timeouts (opt-in with --ai-analysis)
         if args.ai_analysis and (failed > 0 or cancelled > 0):
-            ask_ai_for_conclusion(results)
+            ask_ai_for_conclusion(results, args.timeout)
     elif args.output == "ctrf":
         stop_epoch_ms = int(time.time() * 1000)
         executed_paths = {r["testpath"] for r in results}
