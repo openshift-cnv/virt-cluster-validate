@@ -48,7 +48,7 @@ Validates an OpenShift cluster's virtualization readiness.
 
 ### CLI Options
 
-*   `-o {human,ctrf}`: Output format (Default: `human`). `ctrf` produces a [CTRF](https://ctrf.io) JSON report.
+*   `-o {human,ctrf}`: Output format (Default: `human`). `ctrf` produces a [CTRF](https://ctrf.io) JSON report on stdout for CI/CD integration; prerequisite failures are written to stderr.
 *   `-v, --verbose`: Show test details. Use `-v` for failed/warned checks only, `-vv` for all checks.
 *   `-s, --select PATH`: Run only a specific test script.
 *   `--include PATTERNS`: Comma-separated substrings; only run tests whose path contains at least one pattern (e.g. `--include nodes,basic`).
@@ -125,7 +125,8 @@ The validator includes a global prerequisite check at `checks.d/prerequisite.sh`
 
 1. It runs **before** any tests execute
 2. If it fails, the entire test suite is aborted with exit code 2
-3. The prerequisite output is always displayed (regardless of `-v` flags)
+3. In `human` mode, the prerequisite output is always displayed (regardless of `-v` flags)
+4. In `ctrf` mode, successful prerequisite messages are suppressed on stdout so the JSON report stays machine-readable
 
 By default, it verifies cluster connectivity (`oc whoami`). You can customize this file to add additional checks like required operator installations, minimum cluster versions, or permissions validation.
 

@@ -49,6 +49,13 @@ class TestVirtClusterValidate(unittest.TestCase):
         test_file.chmod(0o755)
         return test_file
 
+    def _create_prerequisite(self, content):
+        """Helper to create a prerequisite script."""
+        prerequisite = self.checks_dir / "prerequisite.sh"
+        prerequisite.write_text(content)
+        prerequisite.chmod(0o755)
+        return prerequisite
+
     def test_runner_ctrf_output(self):
         """Test that the runner correctly identifies passes and failures and outputs CTRF."""
 
@@ -80,6 +87,40 @@ class TestVirtClusterValidate(unittest.TestCase):
         self.assertEqual(failed_test["status"], "failed")
         self.assertIn("trace", failed_test)
         self.assertTrue("I failed!" in failed_test["trace"])
+
+    def test_runner_ctrf_output_ignores_prerequisite_success_stdout(self):
+        """Test that prerequisite success output does not pollute CTRF stdout."""
+        self._create_prerequisite("#!/bin/bash\npass_with info 'Prerequisite passed'\nexit 0")
+        self._create_test("10-pass.d", "#!/bin/bash\necho 'I passed!'\nexit 0")
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "ctrf"],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+
+        self.assertEqual(res.returncode, 0)
+        output = json.loads(res.stdout)
+        self.assertEqual(output["results"]["summary"]["passed"], 1)
+        self.assertEqual(res.stderr, "")
+
+    def test_runner_ctrf_prerequisite_failure_goes_to_stderr(self):
+        """Test that prerequisite failures are reported on stderr in CTRF mode."""
+        self._create_prerequisite("#!/bin/bash\nfail_with 'Prerequisite failed'\n")
+        self._create_test("10-pass.d", "#!/bin/bash\necho 'I passed!'\nexit 0")
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "ctrf"],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+
+        self.assertEqual(res.returncode, 2)
+        self.assertEqual(res.stdout, "")
+        self.assertIn("PREREQUISITE FAILURE", res.stderr)
+        self.assertIn("Prerequisite failed", res.stderr)
 
     def test_runner_fail_fast(self):
         """Test that the runner correctly stops after N failures when --fail-fast is used."""
