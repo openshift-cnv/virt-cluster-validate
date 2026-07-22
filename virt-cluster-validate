@@ -337,19 +337,21 @@ def main():
     prerequisite_file = Path("checks.d/prerequisite.sh")
     if prerequisite_file.exists():
         prereq_result = run_test(prerequisite_file, env, stream_output=False, timeout_secs=args.timeout) if not is_mock else simulate_test(prerequisite_file, stream_output=False, timeout_secs=args.timeout)
+        prereq_stream = sys.stderr if args.output == "ctrf" else sys.stdout
 
         if prereq_result["success"]:
-            print(f"{Colors.GREEN}[PASS]{Colors.NC} {format_time(prereq_result['duration'])} {prerequisite_file}")
-            print()
+            if args.output == "human":
+                print(f"{Colors.GREEN}[PASS]{Colors.NC} {format_time(prereq_result['duration'])} {prerequisite_file}")
+                print()
         else:
-            print(f"{Colors.RED}[FAIL]{Colors.NC} {format_time(prereq_result['duration'])} {prerequisite_file}")
-            print(f"\n{Colors.RED}PREREQUISITE FAILURE: Cannot proceed with tests.{Colors.NC}")
+            print(f"{Colors.RED}[FAIL]{Colors.NC} {format_time(prereq_result['duration'])} {prerequisite_file}", file=prereq_stream)
+            print(f"\n{Colors.RED}PREREQUISITE FAILURE: Cannot proceed with tests.{Colors.NC}", file=prereq_stream)
             for msg in prereq_result["report_messages"]:
-                print(f"    -> {msg}")
+                print(f"    -> {msg}", file=prereq_stream)
             if prereq_result["log"]:
-                print("    --- Prerequisite Output ---")
+                print("    --- Prerequisite Output ---", file=prereq_stream)
                 for line in prereq_result["log"]:
-                    print(f"    {line}")
+                    print(f"    {line}", file=prereq_stream)
             sys.exit(2)
 
     test_files = sorted(Path("checks.d").rglob("test*.sh"))
