@@ -19,6 +19,7 @@ import unittest
 import subprocess
 import tempfile
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 # Path to the script we are testing
 RUNNER_SCRIPT = Path(__file__).parent.parent / "virt-cluster-validate"
@@ -112,6 +113,116 @@ class TestVirtClusterValidate(unittest.TestCase):
 
         res = subprocess.run(
             [sys.executable, str(RUNNER_SCRIPT), "-o", "ctrf"],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+
+        self.assertEqual(res.returncode, 2)
+        self.assertEqual(res.stdout, "")
+        self.assertIn("PREREQUISITE FAILURE", res.stderr)
+        self.assertIn("Prerequisite failed", res.stderr)
+
+    def test_runner_junit_output(self):
+        """Test that the runner emits JUnit XML with pass/fail cases."""
+        self._create_test("10-pass.d", "#!/bin/bash\npass_with info 'All good'\nexit 0")
+        self._create_test("20-fail.d", "#!/bin/bash\nfail_with 'Something broke'\n")
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "junit"],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+
+        self.assertEqual(res.returncode, 1)
+
+        root = ET.fromstring(res.stdout)
+        testsuite = root.find("testsuite")
+        self.assertIsNotNone(testsuite)
+        self.assertEqual(testsuite.attrib["tests"], "2")
+        self.assertEqual(testsuite.attrib["failures"], "1")
+        self.assertEqual(testsuite.attrib["skipped"], "0")
+
+        testcases = {case.attrib["name"]: case for case in testsuite.findall("testcase")}
+        self.assertIn("10-pass.d/test.sh", testcases)
+        self.assertIn("20-fail.d/test.sh", testcases)
+
+        self.assertIsNone(testcases["10-pass.d/test.sh"].find("failure"))
+        self.assertIsNone(testcases["10-pass.d/test.sh"].find("system-out"))
+        failure = testcases["20-fail.d/test.sh"].find("failure")
+        self.assertIsNotNone(failure)
+        self.assertIn("Something broke", failure.attrib["message"])
+        self.assertIsNotNone(testcases["20-fail.d/test.sh"].find("system-out"))
+
+    def test_runner_junit_verbose_includes_system_out_for_passes(self):
+        """Test that -v enables system-out for passing tests in JUnit mode."""
+        self._create_test("10-pass.d", "#!/bin/bash\npass_with info 'All good'\nexit 0")
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "junit", "-v"],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+
+        self.assertEqual(res.returncode, 0)
+
+        root = ET.fromstring(res.stdout)
+        testsuite = root.find("testsuite")
+        self.assertIsNotNone(testsuite)
+        testcase = testsuite.find("testcase")
+        self.assertIsNotNone(testcase)
+        system_out = testcase.find("system-out")
+        self.assertIsNotNone(system_out)
+        self.assertIn("All good", system_out.text)
+
+    def test_runner_junit_output_ignores_prerequisite_success_stdout(self):
+        """Test that prerequisite success output does not pollute JUnit stdout."""
+        self._create_prerequisite("#!/bin/bash\npass_with info 'Prerequisite passed'\nexit 0")
+        self._create_test("10-pass.d", "#!/bin/bash\necho 'I passed!'\nexit 0")
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "junit"],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+
+        self.assertEqual(res.returncode, 0)
+        root = ET.fromstring(res.stdout)
+        testsuite = root.find("testsuite")
+        self.assertIsNotNone(testsuite)
+        self.assertEqual(testsuite.attrib["tests"], "1")
+        self.assertEqual(res.stderr, "")
+
+    def test_runner_junit_no_tests_still_emits_xml(self):
+        """Test that JUnit mode stays machine-readable when no tests are selected."""
+        self._create_test("10-pass.d", "#!/bin/bash\nexit 0")
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "junit", "--include", "does-not-match"],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+
+        self.assertEqual(res.returncode, 0)
+        root = ET.fromstring(res.stdout)
+        testsuite = root.find("testsuite")
+        self.assertIsNotNone(testsuite)
+        self.assertEqual(testsuite.attrib["tests"], "0")
+        self.assertEqual(testsuite.attrib["failures"], "0")
+        self.assertEqual(testsuite.attrib["skipped"], "0")
+        self.assertEqual(res.stderr, "")
+
+    def test_runner_junit_prerequisite_failure_goes_to_stderr(self):
+        """Test that prerequisite failures are reported on stderr in JUnit mode."""
+        self._create_prerequisite("#!/bin/bash\nfail_with 'Prerequisite failed'\n")
+        self._create_test("10-pass.d", "#!/bin/bash\necho 'I passed!'\nexit 0")
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "junit"],
             cwd=self.workspace,
             capture_output=True,
             text=True
