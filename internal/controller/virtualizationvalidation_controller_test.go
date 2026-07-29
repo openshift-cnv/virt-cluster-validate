@@ -388,6 +388,9 @@ func TestJobUsesProfileAndCredentialKeys(t *testing.T) {
 	if value := environmentValue(container.Env, "VIRT_VALIDATE_DATA_SOURCE"); value != "images/rhel10" {
 		t.Fatalf("unexpected data source: %q", value)
 	}
+	if value := environmentValue(container.Env, "VIRT_VALIDATE_RUN_ID"); value != runHashLabel(validation.Status.ObservedInputHash) {
+		t.Fatalf("unexpected run identity: %q", value)
+	}
 	validation.Spec.Run.SuiteTimeoutSeconds = 1200
 	validation.Spec.Run.ExecutionTimeoutSeconds = 300
 	validation.Spec.Run.CleanupPolicy = "OnFailure"

@@ -83,9 +83,17 @@ fi
 virtctl create vm "--volume-import=type:ds,src:${DATA_SOURCE}" > "$MANIFEST" \
   || fail_step "Start VM" Setup "Failed to generate the canary VM manifest"
 oc create --dry-run=client -o json -f "$MANIFEST" | \
-  jq --arg namespace "$NS" --arg hostname "${VIRT_VALIDATE_NODE_HOSTNAME:-}" --arg validation_uid "${VIRT_VALIDATE_VALIDATION_UID:-}" '
+  jq --arg namespace "$NS" --arg hostname "${VIRT_VALIDATE_NODE_HOSTNAME:-}" --arg validation_uid "${VIRT_VALIDATE_VALIDATION_UID:-}" --arg run_id "${VIRT_VALIDATE_RUN_ID:-}" '
     if $namespace != "" then .metadata.namespace = $namespace else . end |
-    if $validation_uid != "" then .metadata.labels["validation.kubevirt.io/validation-uid"] = $validation_uid else . end |
+    .metadata.labels["app.kubernetes.io/managed-by"] = "virt-cluster-validate" |
+    if $validation_uid != "" then .metadata.labels["validation.kubevirt.io/uid"] = $validation_uid else . end |
+    if $run_id != "" then .metadata.labels["validation.kubevirt.io/run"] = $run_id else . end |
+    (.spec.template.metadata.labels["app.kubernetes.io/managed-by"] = "virt-cluster-validate") |
+    if $validation_uid != "" then (.spec.template.metadata.labels["validation.kubevirt.io/uid"] = $validation_uid) else . end |
+    if $run_id != "" then (.spec.template.metadata.labels["validation.kubevirt.io/run"] = $run_id) else . end |
+    (.spec.dataVolumeTemplates[]?.metadata.labels["app.kubernetes.io/managed-by"] = "virt-cluster-validate") |
+    if $validation_uid != "" then (.spec.dataVolumeTemplates[]?.metadata.labels["validation.kubevirt.io/uid"] = $validation_uid) else . end |
+    if $run_id != "" then (.spec.dataVolumeTemplates[]?.metadata.labels["validation.kubevirt.io/run"] = $run_id) else . end |
     if $hostname != "" then .spec.template.spec.nodeSelector["kubernetes.io/hostname"] = $hostname else . end
   ' > "${MANIFEST}.json" \
   || fail_step "Start VM" Setup "Failed to prepare the canary VM manifest"
@@ -117,7 +125,9 @@ kind: VirtualMachineSnapshot
 metadata:
   name: ${SNAPSHOT_NAME}
   labels:
-    validation.kubevirt.io/validation-uid: "${VIRT_VALIDATE_VALIDATION_UID:-}"
+    app.kubernetes.io/managed-by: virt-cluster-validate
+    validation.kubevirt.io/uid: "${VIRT_VALIDATE_VALIDATION_UID:-}"
+    validation.kubevirt.io/run: "${VIRT_VALIDATE_RUN_ID:-}"
 spec:
   source:
     apiGroup: kubevirt.io
@@ -157,7 +167,9 @@ kind: VirtualMachineInstanceMigration
 metadata:
   name: ${MIGRATION_NAME}
   labels:
-    validation.kubevirt.io/validation-uid: "${VIRT_VALIDATE_VALIDATION_UID:-}"
+    app.kubernetes.io/managed-by: virt-cluster-validate
+    validation.kubevirt.io/uid: "${VIRT_VALIDATE_VALIDATION_UID:-}"
+    validation.kubevirt.io/run: "${VIRT_VALIDATE_RUN_ID:-}"
 spec:
   vmiName: ${VMNAME}
 EOF

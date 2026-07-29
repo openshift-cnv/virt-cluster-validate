@@ -302,6 +302,7 @@ func (r *VirtualizationValidationReconciler) job(validation *validationv1alpha1.
 		{Name: "VIRT_VALIDATE_RESULT_CONFIGMAP", Value: resultName},
 		{Name: "VIRT_VALIDATE_RESULT_CONFIGMAP_NAMESPACE", Value: validation.Namespace},
 		{Name: "VIRT_VALIDATE_VALIDATION_UID", Value: string(validation.UID)},
+		{Name: "VIRT_VALIDATE_RUN_ID", Value: runHashLabel(validation.Status.ObservedInputHash)},
 	}
 	env = append(env,
 		corev1.EnvVar{Name: "VIRT_VALIDATE_PROFILE", Value: profile},

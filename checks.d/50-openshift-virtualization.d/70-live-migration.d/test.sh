@@ -73,7 +73,18 @@ oc auth can-i create virtualmachineinstancemigrations.kubevirt.io ${NS:+-n "$NS"
 virtctl create vm "--volume-import=type:ds,src:${DATA_SOURCE}" > vm.yaml \
   || fail_migration Setup "Failed to generate the migration VM manifest"
 oc create --dry-run=client -o json -f vm.yaml | \
-  jq --arg namespace "$NS" 'if $namespace != "" then .metadata.namespace = $namespace else . end' > vm.json \
+  jq --arg namespace "$NS" --arg validation_uid "${VIRT_VALIDATE_VALIDATION_UID:-}" --arg run_id "${VIRT_VALIDATE_RUN_ID:-}" '
+    if $namespace != "" then .metadata.namespace = $namespace else . end |
+    .metadata.labels["app.kubernetes.io/managed-by"] = "virt-cluster-validate" |
+    if $validation_uid != "" then .metadata.labels["validation.kubevirt.io/uid"] = $validation_uid else . end |
+    if $run_id != "" then .metadata.labels["validation.kubevirt.io/run"] = $run_id else . end |
+    (.spec.template.metadata.labels["app.kubernetes.io/managed-by"] = "virt-cluster-validate") |
+    if $validation_uid != "" then (.spec.template.metadata.labels["validation.kubevirt.io/uid"] = $validation_uid) else . end |
+    if $run_id != "" then (.spec.template.metadata.labels["validation.kubevirt.io/run"] = $run_id) else . end |
+    (.spec.dataVolumeTemplates[]?.metadata.labels["app.kubernetes.io/managed-by"] = "virt-cluster-validate") |
+    if $validation_uid != "" then (.spec.dataVolumeTemplates[]?.metadata.labels["validation.kubevirt.io/uid"] = $validation_uid) else . end |
+    if $run_id != "" then (.spec.dataVolumeTemplates[]?.metadata.labels["validation.kubevirt.io/run"] = $run_id) else . end
+  ' > vm.json \
   || fail_migration Setup "Failed to prepare the migration VM manifest"
 mv vm.json vm.yaml
 oc create ${NS:+-n "$NS"} -f vm.yaml \
@@ -95,6 +106,10 @@ apiVersion: kubevirt.io/v1
 kind: VirtualMachineInstanceMigration
 metadata:
   name: ${MIGRATION_NAME}
+  labels:
+    app.kubernetes.io/managed-by: virt-cluster-validate
+    validation.kubevirt.io/uid: "${VIRT_VALIDATE_VALIDATION_UID:-}"
+    validation.kubevirt.io/run: "${VIRT_VALIDATE_RUN_ID:-}"
 spec:
   vmiName: ${VMNAME}
 status: {}
