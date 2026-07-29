@@ -101,6 +101,43 @@ jobs:
             exit 1
           fi
 
+      - name: Check for managed-by label on resource-creating scripts
+        run: |
+          fail=0
+          while IFS= read -r -d '' file; do
+            # Check if this script creates or applies resources (outside cleanup blocks)
+            creates=$(awk '
+              /<<[A-Za-z_]+/ {
+                if (/(oc (create|apply)|virtctl create)/) found = 1
+                marker = $NF
+                gsub(/[^A-Za-z_]/, "", marker)
+                in_heredoc = 1
+                next
+              }
+              in_heredoc && $0 ~ "^" marker "$" { in_heredoc = 0; next }
+              in_heredoc { next }
+              /^\s*#/ { next }
+              /cleanup\(\)/ { in_cleanup = 1 }
+              in_cleanup && /^\}/ { in_cleanup = 0; next }
+              in_cleanup { next }
+              /(oc (create|apply)|virtctl create)/ { found = 1 }
+              END { if (found) print "yes" }
+            ' "$file")
+            if [ "$creates" = "yes" ]; then
+              if ! grep -q 'app\.kubernetes\.io/managed-by.*virt-cluster-validate' "$file"; then
+                echo "ERROR: $file creates cluster resources but does not apply the managed-by label"
+                fail=1
+              fi
+            fi
+          done < <(find checks.d -name '*.sh' -print0)
+          if [ "$fail" -eq 1 ]; then
+            echo ""
+            echo "Scripts that create cluster resources must label them with:"
+            echo "  app.kubernetes.io/managed-by: virt-cluster-validate"
+            echo "This ensures leftover resources can be identified and cleaned up."
+            exit 1
+          fi
+
       - name: Run shellcheck on bin helpers and gather
         run: |
           shellcheck -s bash -S warning -e SC1091 \

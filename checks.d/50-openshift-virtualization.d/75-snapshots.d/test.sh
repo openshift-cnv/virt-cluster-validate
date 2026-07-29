@@ -16,11 +16,13 @@
 #
 
 NS="${VIRT_VALIDATE_NAMESPACE:-}"
+MANAGED_BY_LABEL="app.kubernetes.io/managed-by=virt-cluster-validate"
 
 cleanup() {
   [ -f restore.yaml ] && oc delete ${NS:+-n "$NS"} -f restore.yaml --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
   [ -f snap.yaml ] && oc delete ${NS:+-n "$NS"} -f snap.yaml --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
   [ -f vm.yaml ] && oc delete ${NS:+-n "$NS"} -f vm.yaml --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
+  oc delete ${NS:+-n "$NS"} vm,vmsnapshot,vmrestore,dv,pvc -l "$MANAGED_BY_LABEL" --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -30,6 +32,7 @@ if [ "$VSC_COUNT" -eq 0 ]; then
 fi
 
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
+sed -i '/^  labels:$/a\    app.kubernetes.io/managed-by: virt-cluster-validate' vm.yaml
 oc create ${NS:+-n "$NS"} -f vm.yaml \
   || fail_with Setup "Failed to create test VM"
 
@@ -45,6 +48,8 @@ apiVersion: snapshot.kubevirt.io/v1alpha1
 kind: VirtualMachineSnapshot
 metadata:
   name: snap-${VMNAME}
+  labels:
+    app.kubernetes.io/managed-by: virt-cluster-validate
 spec:
   source:
     apiGroup: kubevirt.io
@@ -65,6 +70,8 @@ apiVersion: snapshot.kubevirt.io/v1alpha1
 kind: VirtualMachineRestore
 metadata:
   name: restore-${VMNAME}
+  labels:
+    app.kubernetes.io/managed-by: virt-cluster-validate
 spec:
   target:
     apiGroup: kubevirt.io

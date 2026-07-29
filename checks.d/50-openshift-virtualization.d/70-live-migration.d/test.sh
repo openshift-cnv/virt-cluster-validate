@@ -16,10 +16,12 @@
 #
 
 NS="${VIRT_VALIDATE_NAMESPACE:-}"
+MANAGED_BY_LABEL="app.kubernetes.io/managed-by=virt-cluster-validate"
 
 cleanup() {
   [ -f migration.yaml ] && oc delete ${NS:+-n "$NS"} -f migration.yaml --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
   [ -f vm.yaml ] && oc delete ${NS:+-n "$NS"} -f vm.yaml --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
+  oc delete ${NS:+-n "$NS"} vm,vmim,dv,pvc -l "$MANAGED_BY_LABEL" --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -28,6 +30,7 @@ oc auth can-i create virtualmachineinstancemigrations.kubevirt.io || {
 }
 
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
+sed -i '/^  labels:$/a\    app.kubernetes.io/managed-by: virt-cluster-validate' vm.yaml
 oc create ${NS:+-n "$NS"} -f vm.yaml \
   || fail_with Setup "Failed to create test VM"
 
@@ -44,6 +47,8 @@ apiVersion: kubevirt.io/v1
 kind: VirtualMachineInstanceMigration
 metadata:
   name: ${VMNAME}-migration
+  labels:
+    app.kubernetes.io/managed-by: virt-cluster-validate
 spec:
   vmiName: ${VMNAME}
 status: {}

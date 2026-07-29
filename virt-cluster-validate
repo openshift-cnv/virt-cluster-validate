@@ -239,6 +239,44 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180):
         "warnings": [line for line in log_lines if "warn" in line.lower()]
     }
 
+MANAGED_BY_LABEL = "app.kubernetes.io/managed-by=virt-cluster-validate"
+
+def cleanup_leftover_resources(env):
+    """Sweep for resources left behind by checks and delete them.
+    Returns a list of (kind, name) tuples that were found."""
+    ns_args = []
+    ns = env.get("VIRT_VALIDATE_NAMESPACE")
+    if ns:
+        ns_args = ["-n", ns]
+
+    resource_types = "pods,vm,vmim,vmsnapshot,vmrestore,dv,pvc"
+    try:
+        result = subprocess.run(
+            ["oc", "get", resource_types, "-l", MANAGED_BY_LABEL,
+             "-o", "jsonpath={range .items[*]}{.kind}/{.metadata.name} {end}"]
+            + ns_args,
+            capture_output=True, text=True, timeout=30, env=env,
+        )
+    except Exception:
+        return []
+
+    leftovers = result.stdout.split()
+    if not leftovers:
+        return []
+
+    try:
+        subprocess.run(
+            ["oc", "delete", resource_types, "-l", MANAGED_BY_LABEL,
+             "--ignore-not-found=true", "--force", "--grace-period=0", "--wait=false"]
+            + ns_args,
+            capture_output=True, timeout=30, env=env,
+        )
+    except Exception:
+        pass
+
+    return leftovers
+
+
 def execute_task(test_file, env, ui, stream_output, timeout_secs, mock):
     """Wrapper that updates the terminal status before and after execution."""
     ui.update_test(str(test_file), "[    ]")
@@ -487,6 +525,11 @@ def main():
     for t in (str(tf) for tf in test_files if str(tf) not in executed_paths):
         ui.update_test(t, f"[{Colors.YELLOW}SKIP{Colors.NC}]")
 
+    # 4.5. Post-run cleanup: sweep for leftover resources
+    leftovers = []
+    if not is_mock:
+        leftovers = cleanup_leftover_resources(env)
+
     # 5. Output Results
     results.sort(key=lambda x: x["testpath"])
 
@@ -517,6 +560,11 @@ def main():
         print("-" * 40)
         print(summary)
         print(f"Total time: {format_time(time.monotonic() - start_time)}")
+
+        if leftovers:
+            print(f"\n{Colors.YELLOW}WARNING: Cleaned up {len(leftovers)} leftover resource(s):{Colors.NC}")
+            for item in leftovers:
+                print(f"  {Colors.YELLOW}- {item}{Colors.NC}")
 
         # Suggest -v flag if there are failures/warnings and verbose is not set
         if args.verbose == 0 and (failed > 0 or warnings > 0):
@@ -578,9 +626,14 @@ def main():
                 "tests": ctrf_tests,
             }
         }
+        if leftovers:
+            ctrf_report["results"]["extra"] = {"leftoverResources": leftovers}
         print(json.dumps(ctrf_report, indent=2))
     elif args.output == "junit":
         print(build_junit_xml(results, test_files, skipped, failed + cancelled, verbose=args.verbose > 0))
+
+    if leftovers and args.output != "human":
+        print(f"WARNING: Cleaned up {len(leftovers)} leftover resource(s): {', '.join(leftovers)}", file=sys.stderr)
 
     import shutil
     shutil.rmtree(cache_dir, ignore_errors=True)

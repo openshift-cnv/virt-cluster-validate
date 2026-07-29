@@ -16,13 +16,16 @@
 #
 
 NS="${VIRT_VALIDATE_NAMESPACE:-}"
+MANAGED_BY_LABEL="app.kubernetes.io/managed-by=virt-cluster-validate"
 
 cleanup() {
   [ -f vm.yaml ] && oc delete ${NS:+-n "$NS"} -f vm.yaml --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
+  oc delete ${NS:+-n "$NS"} vm,dv,pvc -l "$MANAGED_BY_LABEL" --ignore-not-found=true --force --grace-period=0 --wait=false >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
+sed -i '/^  labels:$/a\    app.kubernetes.io/managed-by: virt-cluster-validate' vm.yaml
 oc create ${NS:+-n "$NS"} -f vm.yaml \
   || fail_with Setup "Failed to create test VM"
 

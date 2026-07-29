@@ -49,6 +49,7 @@ metadata:
   name: ${POD_NAME}
   labels:
     app: virt-cluster-validate-c0-check
+    app.kubernetes.io/managed-by: virt-cluster-validate
 spec:
   nodeName: ${NODE_NAME}
   restartPolicy: Never
