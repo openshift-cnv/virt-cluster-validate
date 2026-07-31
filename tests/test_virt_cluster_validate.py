@@ -233,6 +233,52 @@ class TestVirtClusterValidate(unittest.TestCase):
         self.assertIn("PREREQUISITE FAILURE", res.stderr)
         self.assertIn("Prerequisite failed", res.stderr)
 
+    def test_runner_junit_file_written_alongside_ctrf(self):
+        """Test that --junit-file writes JUnit XML while stdout gets CTRF JSON."""
+        self._create_test("10-pass.d", "#!/bin/bash\npass_with info 'All good'\nexit 0")
+        self._create_test("20-fail.d", "#!/bin/bash\nfail_with 'Something broke'\n")
+
+        junit_path = os.path.join(self.workspace, "junit-out.xml")
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "ctrf", "--junit-file", junit_path],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+
+        self.assertEqual(res.returncode, 1)
+
+        ctrf = json.loads(res.stdout)
+        self.assertEqual(ctrf["results"]["summary"]["tests"], 2)
+        self.assertEqual(ctrf["results"]["summary"]["failed"], 1)
+
+        self.assertTrue(os.path.exists(junit_path))
+        root = ET.parse(junit_path).getroot()
+        testsuite = root.find("testsuite")
+        self.assertIsNotNone(testsuite)
+        self.assertEqual(testsuite.attrib["tests"], "2")
+        self.assertEqual(testsuite.attrib["failures"], "1")
+
+    def test_runner_junit_file_no_tests(self):
+        """Test that --junit-file writes valid empty XML when no tests match."""
+        self._create_test("10-pass.d", "#!/bin/bash\nexit 0")
+
+        junit_path = os.path.join(self.workspace, "junit-out.xml")
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "ctrf", "--junit-file", junit_path, "--include", "does-not-match"],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True
+        )
+
+        self.assertEqual(res.returncode, 0)
+        self.assertTrue(os.path.exists(junit_path))
+        root = ET.parse(junit_path).getroot()
+        testsuite = root.find("testsuite")
+        self.assertIsNotNone(testsuite)
+        self.assertEqual(testsuite.attrib["tests"], "0")
+        self.assertEqual(testsuite.attrib["failures"], "0")
+
     def test_runner_fail_fast(self):
         """Test that the runner correctly stops after N failures when --fail-fast is used."""
 

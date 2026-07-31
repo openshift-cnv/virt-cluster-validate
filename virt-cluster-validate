@@ -396,6 +396,7 @@ def main():
     parser.add_argument("--include", metavar="PATTERNS", help="Comma-separated substrings to match; only run tests whose path contains at least one pattern")
     parser.add_argument("--exclude", metavar="PATTERNS", help="Comma-separated substrings to match; skip tests whose path contains any pattern")
     parser.add_argument("--log-dir", metavar="DIR", help="Write per-check log files to this directory")
+    parser.add_argument("--junit-file", metavar="PATH", help="Write JUnit XML to this file (in addition to stdout output)")
     parser.add_argument("-t", "--timeout", type=parse_timespan, default="180", metavar="SPAN", help="Timeout for each test (e.g. 3m, 45s, 180; default: 180)")
     parser.add_argument("-c", "--concurrency", type=int, default=os.cpu_count() or 4, metavar="N", help="Number of concurrent tests to run (default: CPU count)")
     args = parser.parse_args()
@@ -441,6 +442,8 @@ def main():
         test_files = [t for t in test_files if str(t) == args.select]
 
     if not test_files:
+        if args.junit_file:
+            Path(args.junit_file).write_text(build_junit_xml([], [], 0, 0, verbose=args.verbose > 0))
         if args.output == "junit":
             print(build_junit_xml([], [], 0, 0, verbose=args.verbose > 0))
         else:
@@ -581,6 +584,9 @@ def main():
         print(json.dumps(ctrf_report, indent=2))
     elif args.output == "junit":
         print(build_junit_xml(results, test_files, skipped, failed + cancelled, verbose=args.verbose > 0))
+
+    if args.junit_file:
+        Path(args.junit_file).write_text(build_junit_xml(results, test_files, skipped, failed + cancelled, verbose=args.verbose > 0))
 
     import shutil
     shutil.rmtree(cache_dir, ignore_errors=True)
