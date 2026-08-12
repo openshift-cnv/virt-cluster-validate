@@ -10,3 +10,5 @@ __pycache__/
 # Claude local settings (but allow skills to be shared)
 .claude/settings.json
 .claude/settings.local.json
+
+ai-analysis*

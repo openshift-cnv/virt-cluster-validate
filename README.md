@@ -46,6 +46,9 @@ Validates an OpenShift cluster's virtualization readiness.
     # Write per-check logs to a directory
     ./virt-cluster-validate --log-dir /tmp/check-logs
 
+    # Get AI-powered analysis of failures (requires Claude Code or Gemini CLI)
+    ./virt-cluster-validate --ai-analysis
+
 ### CLI Options
 
 *   `-o {human,ctrf,junit}`: Output format (Default: `human`). `ctrf` produces a [CTRF](https://ctrf.io) JSON report on stdout for CI/CD integration; `junit` produces JUnit XML on stdout. In both machine-readable modes, prerequisite failures are written to stderr.
@@ -57,6 +60,7 @@ Validates an OpenShift cluster's virtualization readiness.
 *   `-t, --timeout SPAN`: Max execution time per test (e.g. `2m`, `45s`, `180`. Default: `180`).
 *   `-c, --concurrency N`: Number of tests to run in parallel (Default: Number of CPU cores).
 *   `-f [N], --fail-fast [N]`: Stop execution after N failures (Default: 1).
+*   `--ai-analysis`: Analyze failures with AI (Claude Code or Gemini CLI). Creates a self-contained analysis file with all test results and AI-suggested remediation steps. Checks for `claude` or `gemini` command in PATH (alphabetical order).
 
 ## Disconnected Environments (Container)
 
