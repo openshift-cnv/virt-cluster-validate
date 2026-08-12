@@ -33,7 +33,7 @@ oc create ${NS:+-n "$NS"} -f vm.yaml \
 
 VMNAME=$(oc get ${NS:+-n "$NS"} -o jsonpath='{.metadata.name}' -f vm.yaml)
 
-oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout=2m -f vm.yaml \
+oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout="${VM_READY_TIMEOUT:-2m}" -f vm.yaml \
 || {
   oc get ${NS:+-n "$NS"} -o yaml vm $VMNAME
   fail_with Scheduling "Unable to schedule VMs?"
@@ -56,7 +56,7 @@ APPLY_OUT=$(oc apply ${NS:+-n "$NS"} -f migration.yaml 2>&1) || {
   fail_with Migration "Failed to create migration: $APPLY_OUT"
 }
 
-oc wait ${NS:+-n "$NS"} --for=jsonpath='{.status.phase}'=Succeeded --timeout=2m -f migration.yaml \
+oc wait ${NS:+-n "$NS"} --for=jsonpath='{.status.phase}'=Succeeded --timeout="${VM_READY_TIMEOUT:-2m}" -f migration.yaml \
 || {
   oc get ${NS:+-n "$NS"} -o yaml -f vm.yaml
   oc get ${NS:+-n "$NS"} -o yaml -f migration.yaml
