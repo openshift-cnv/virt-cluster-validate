@@ -462,5 +462,99 @@ class TestVirtClusterValidate(unittest.TestCase):
         log_content = log_files[0].read_text()
         self.assertIn("hello from test", log_content)
 
+    def test_url_and_token_writes_kubeconfig(self):
+        """Test that --url and --token write KUBECONFIG for checks."""
+        self._create_prerequisite("#!/bin/bash\nexit 0")
+        self._create_test(
+            "10-kubeconfig.d",
+            "#!/bin/bash\n"
+            "python3 -c \"import json,os; c=json.load(open(os.environ['KUBECONFIG'])); "
+            "assert c['clusters'][0]['cluster']['server']=='https://api.cluster.example.com:6443'; "
+            "assert c['users'][0]['user']['token']=='test-token'; "
+            "assert c['clusters'][0]['cluster'].get('insecure-skip-tls-verify') is True\"\n"
+        )
+
+        res = subprocess.run(
+            [
+                sys.executable, str(RUNNER_SCRIPT), "-o", "ctrf",
+                "--url", "https://api.cluster.example.com:6443",
+                "--token", "test-token",
+                "--insecure-skip-tls",
+            ],
+            cwd=self.workspace,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
+        output = json.loads(res.stdout)
+        self.assertEqual(output["results"]["summary"]["passed"], 1)
+
+    def test_url_without_token_errors(self):
+        """Test that --url without --token is rejected."""
+        self._create_test("10-pass.d", "#!/bin/bash\nexit 0")
+
+        run_env = os.environ.copy()
+        run_env.pop("VIRT_VALIDATE_URL", None)
+        run_env.pop("VIRT_VALIDATE_TOKEN", None)
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "--url", "https://api.cluster.example.com:6443"],
+            cwd=self.workspace,
+            env=run_env,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("--url and --token must be provided together", res.stderr)
+
+    def test_token_without_url_errors(self):
+        """Test that --token without --url is rejected."""
+        self._create_test("10-pass.d", "#!/bin/bash\nexit 0")
+
+        run_env = os.environ.copy()
+        run_env.pop("VIRT_VALIDATE_URL", None)
+        run_env.pop("VIRT_VALIDATE_TOKEN", None)
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "--token", "test-token"],
+            cwd=self.workspace,
+            env=run_env,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("--url and --token must be provided together", res.stderr)
+
+    def test_provider_auth_from_env(self):
+        """Test that VIRT_VALIDATE_URL and VIRT_VALIDATE_TOKEN set KUBECONFIG."""
+        self._create_prerequisite("#!/bin/bash\nexit 0")
+        self._create_test(
+            "10-kubeconfig.d",
+            "#!/bin/bash\n"
+            "python3 -c \"import json,os; c=json.load(open(os.environ['KUBECONFIG'])); "
+            "assert c['clusters'][0]['cluster']['server']=='https://api.env.example.com:6443'; "
+            "assert c['users'][0]['user']['token']=='env-token'; "
+            "assert 'VIRT_VALIDATE_TOKEN' not in os.environ\"\n"
+        )
+
+        run_env = os.environ.copy()
+        run_env["VIRT_VALIDATE_URL"] = "https://api.env.example.com:6443"
+        run_env["VIRT_VALIDATE_TOKEN"] = "env-token"
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT), "-o", "ctrf"],
+            cwd=self.workspace,
+            env=run_env,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
+        output = json.loads(res.stdout)
+        self.assertEqual(output["results"]["summary"]["passed"], 1)
+
 if __name__ == "__main__":
     unittest.main()

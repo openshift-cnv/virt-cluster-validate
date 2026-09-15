@@ -27,7 +27,7 @@
 set -x
 
 # Verify we're logged into an OpenShift cluster
-oc whoami > /dev/null 2>&1 || fail_with "Not logged into an OpenShift cluster. Please run 'oc login' first."
+oc whoami > /dev/null 2>&1 || fail_with "Not logged into an OpenShift cluster. Run 'oc login' or pass --url and --token."
 
 # Report success
 pass_with info "Cluster connection verified as $(oc whoami)"

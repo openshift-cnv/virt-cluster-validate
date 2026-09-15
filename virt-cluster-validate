@@ -387,6 +387,35 @@ def print_details(results, verbose, skip_log_print=False):
                 print("    --- Test Output ---")
                 for line in r["log"]: print(f"    {line}")
 
+def write_provider_kubeconfig(path, url, token, insecure_skip_tls=False):
+    """Write a kubeconfig that authenticates with a bearer token (kubectl-mtv provider style)."""
+    cluster = {"server": url}
+    if insecure_skip_tls:
+        cluster["insecure-skip-tls-verify"] = True
+    kubeconfig = {
+        "apiVersion": "v1",
+        "kind": "Config",
+        "clusters": [{"name": "cluster", "cluster": cluster}],
+        "users": [{"name": "token", "user": {"token": token}}],
+        "contexts": [{"name": "default", "context": {"cluster": "cluster", "user": "token"}}],
+        "current-context": "default",
+    }
+    path.write_text(json.dumps(kubeconfig, indent=2) + "\n")
+    path.chmod(0o600)
+
+
+def resolve_provider_auth(args):
+    """Return (url, token) from flags or env. Both must be set together."""
+    url = args.url or os.environ.get("VIRT_VALIDATE_URL") or ""
+    token = args.token or os.environ.get("VIRT_VALIDATE_TOKEN") or ""
+    if bool(url) != bool(token):
+        raise argparse.ArgumentTypeError(
+            "--url and --token must be provided together "
+            "(or set both VIRT_VALIDATE_URL and VIRT_VALIDATE_TOKEN)."
+        )
+    return url, token
+
+
 def main():
     parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
     parser.add_argument("-o", "--output", choices=["human", "ctrf", "junit"], default="human", help="Output format (default: human)")
@@ -399,13 +428,35 @@ def main():
     parser.add_argument("--junit-file", metavar="PATH", help="Write JUnit XML to this file (in addition to stdout output)")
     parser.add_argument("-t", "--timeout", type=parse_timespan, default="180", metavar="SPAN", help="Timeout for each test (e.g. 3m, 45s, 180; default: 180)")
     parser.add_argument("-c", "--concurrency", type=int, default=os.cpu_count() or 4, metavar="N", help="Number of concurrent tests to run (default: CPU count)")
+    parser.add_argument("--url", metavar="URL", help="OpenShift API server URL (requires --token)")
+    parser.add_argument("--token", metavar="TOKEN", help="Bearer token for --url (service account or user token)")
+    parser.add_argument("--insecure-skip-tls", action="store_true", help="Skip TLS verification for --url (self-signed API certs)")
     args = parser.parse_args()
+
+    try:
+        provider_url, token = resolve_provider_auth(args)
+    except argparse.ArgumentTypeError as exc:
+        parser.error(str(exc))
 
     # 1. Environment & Discovery
     cache_dir = tempfile.mkdtemp(prefix="virt_validate_cache_")
+    try:
+        _run_with_cache(args, cache_dir, provider_url, token)
+    finally:
+        shutil.rmtree(cache_dir, ignore_errors=True)
+
+
+def _run_with_cache(args, cache_dir, provider_url, token):
     env = {**os.environ,
            "PATH": f"{os.path.abspath('bin')}{os.pathsep}{os.environ.get('PATH', '')}",
            "VIRT_VALIDATE_CACHE_DIR": cache_dir}
+    env.pop("VIRT_VALIDATE_TOKEN", None)
+
+    if provider_url:
+        kubeconfig_path = Path(cache_dir) / "kubeconfig"
+        insecure = args.insecure_skip_tls or os.environ.get("VIRT_VALIDATE_INSECURE_SKIP_TLS", "").lower() in ("1", "true", "yes")
+        write_provider_kubeconfig(kubeconfig_path, provider_url, token, insecure)
+        env["KUBECONFIG"] = str(kubeconfig_path)
 
     is_mock = os.environ.get("VIRT_VALIDATE_MOCK") == "1"
 
@@ -587,9 +638,6 @@ def main():
 
     if args.junit_file:
         Path(args.junit_file).write_text(build_junit_xml(results, test_files, skipped, failed + cancelled, verbose=args.verbose > 0))
-
-    import shutil
-    shutil.rmtree(cache_dir, ignore_errors=True)
 
     sys.exit(1 if failed_count_live > 0 else 0)
 
