@@ -15,6 +15,7 @@
 import os
 import sys
 import json
+import time
 import unittest
 import subprocess
 import tempfile
@@ -367,6 +368,8 @@ class TestVirtClusterValidate(unittest.TestCase):
         output = json.loads(res.stdout)
 
         self.assertIn("results", output)
+        self.assertEqual(output["reportFormat"], "CTRF")
+        self.assertEqual(output["specVersion"], "0.0.0")
         results = output["results"]
         self.assertIn("tool", results)
         self.assertIn("summary", results)
@@ -396,6 +399,46 @@ class TestVirtClusterValidate(unittest.TestCase):
         failed_test = next(t for t in tests if "20-fail" in t["name"])
         self.assertEqual(failed_test["status"], "failed")
         self.assertIn("trace", failed_test)
+
+    def test_report_file_publishes_pending_then_final_ctrf_snapshots(self):
+        """Test that --report-file is atomic CTRF and exposes pending checks while running."""
+        self._create_test("10-slow-pass.d", "#!/bin/bash\nsleep 1\nexit 0")
+        self._create_test("20-slow-pass.d", "#!/bin/bash\nsleep 3\nexit 0")
+        report_file = self.workspace / "report.json"
+
+        process = subprocess.Popen(
+            [sys.executable, str(RUNNER_SCRIPT), "--report-file", str(report_file), "-c", "1"],
+            cwd=self.workspace, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            deadline = time.time() + 5
+            pending_report = None
+            partial_report = None
+            while time.time() < deadline:
+                if report_file.exists():
+                    report = json.loads(report_file.read_text())
+                    summary = report["results"]["summary"]
+                    if summary["pending"] == 2:
+                        pending_report = report
+                    if summary["passed"] == 1 and summary["pending"] == 1:
+                        partial_report = report
+                        break
+                time.sleep(0.05)
+            self.assertIsNotNone(pending_report)
+            self.assertEqual(pending_report["reportFormat"], "CTRF")
+            self.assertEqual(pending_report["specVersion"], "0.0.0")
+            self.assertIn("stop", pending_report["results"]["summary"])
+            self.assertEqual(pending_report["results"]["summary"]["tests"], 2)
+            self.assertEqual(pending_report["results"]["summary"]["pending"], 2)
+            self.assertIsNotNone(partial_report)
+        finally:
+            stdout, stderr = process.communicate(timeout=10)
+
+        self.assertEqual(process.returncode, 0, stderr + stdout)
+        final_report = json.loads(report_file.read_text())
+        self.assertEqual(final_report["results"]["summary"]["pending"], 0)
+        self.assertEqual(final_report["results"]["summary"]["passed"], 2)
+        self.assertIn("stop", final_report["results"]["summary"])
 
     def test_include_filter(self):
         """Test that --include filters tests by substring match."""
