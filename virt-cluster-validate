@@ -430,6 +430,90 @@ def resolve_provider_auth(args):
     return url, token, ca_file
 
 
+def ctrf_suite(testpath):
+    parts = testpath.split("/")
+    if len(parts) >= 2:
+        return parts[1].removesuffix(".d")
+    return ""
+
+
+def ctrf_test_entry(test_file, result=None, complete=False):
+    """Build one CTRF test entry, using pending until its check has completed."""
+    testpath = str(test_file)
+    entry = {
+        "name": testpath.removeprefix("checks.d/"),
+        "status": "pending",
+        "suite": ctrf_suite(testpath),
+    }
+    if result is None:
+        if complete:
+            entry["status"] = "skipped"
+            entry["duration"] = 0
+        return entry
+
+    if result.get("skipped"):
+        entry["status"] = "skipped"
+    elif result["success"]:
+        entry["status"] = "passed"
+    else:
+        entry["status"] = "failed"
+    entry["duration"] = int(result["duration"] * 1000)
+    if result["report_messages"]:
+        entry["message"] = "; ".join(result["report_messages"])
+    if not result["success"] and result["log"]:
+        entry["trace"] = "\n".join(result["log"])
+    return entry
+
+
+def build_ctrf_report(test_files, results, start_epoch_ms, stop_epoch_ms=None, complete=False):
+    """Build a complete, schema-valid CTRF snapshot for the selected checks."""
+    results_by_path = {r["testpath"]: r for r in results}
+    tests = [ctrf_test_entry(test_file, results_by_path.get(str(test_file)), complete) for test_file in test_files]
+    counts = {status: sum(1 for test in tests if test["status"] == status)
+              for status in ("passed", "failed", "pending", "skipped")}
+    summary = {
+        "tests": len(tests),
+        "passed": counts["passed"],
+        "failed": counts["failed"],
+        "pending": counts["pending"],
+        "skipped": counts["skipped"],
+        "other": 0,
+        "start": start_epoch_ms,
+    }
+    # CTRF requires a timestamped summary even for an in-progress snapshot. Until
+    # the run completes, stop denotes the instant this snapshot was generated.
+    summary["stop"] = stop_epoch_ms or int(time.time() * 1000)
+    return {
+        "reportFormat": "CTRF",
+        "specVersion": "0.0.0",
+        "results": {
+            "tool": {"name": "virt-cluster-validate"},
+            "summary": summary,
+            "tests": tests,
+        },
+    }
+
+
+def write_ctrf_report(path, report):
+    """Atomically replace a CTRF snapshot so readers never see partial JSON."""
+    report_path = Path(path)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(prefix=f".{report_path.name}.", dir=report_path.parent)
+    try:
+        with os.fdopen(fd, "w") as report_file:
+            json.dump(report, report_file, indent=2)
+            report_file.write("\n")
+            report_file.flush()
+            os.fsync(report_file.fileno())
+        os.replace(temp_path, report_path)
+    except BaseException:
+        try:
+            os.unlink(temp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
 def main():
     parser = argparse.ArgumentParser(description="Simple test runner for virt-cluster-validate checks.")
     parser.add_argument("-o", "--output", choices=["human", "ctrf", "junit"], default="human", help="Output format (default: human)")
@@ -439,6 +523,7 @@ def main():
     parser.add_argument("--include", metavar="PATTERNS", help="Comma-separated substrings to match; only run tests whose path contains at least one pattern")
     parser.add_argument("--exclude", metavar="PATTERNS", help="Comma-separated substrings to match; skip tests whose path contains any pattern")
     parser.add_argument("--log-dir", metavar="DIR", help="Write per-check log files to this directory")
+    parser.add_argument("--report-file", metavar="PATH", help="Write atomic CTRF snapshots to this file")
     parser.add_argument("--junit-file", metavar="PATH", help="Write JUnit XML to this file (in addition to stdout output)")
     parser.add_argument("-t", "--timeout", type=parse_timespan, default="180", metavar="SPAN", help="Timeout for each test (e.g. 3m, 45s, 180; default: 180)")
     parser.add_argument("-c", "--concurrency", type=int, default=os.cpu_count() or 4, metavar="N", help="Number of concurrent tests to run (default: CPU count)")
@@ -508,10 +593,15 @@ def _run_with_cache(args, cache_dir, provider_url, token, ca_file):
         test_files = [t for t in test_files if str(t) == args.select]
 
     if not test_files:
+        now = int(time.time() * 1000)
+        if args.report_file:
+            write_ctrf_report(args.report_file, build_ctrf_report([], [], now, now, complete=True))
         if args.junit_file:
             Path(args.junit_file).write_text(build_junit_xml([], [], 0, 0, verbose=args.verbose > 0))
         if args.output == "junit":
             print(build_junit_xml([], [], 0, 0, verbose=args.verbose > 0))
+        elif args.output == "ctrf":
+            print(json.dumps(build_ctrf_report([], [], now, now, complete=True), indent=2))
         else:
             print("No tests found.")
         sys.exit(0)
@@ -530,6 +620,9 @@ def _run_with_cache(args, cache_dir, provider_url, token, ca_file):
     start_time = time.monotonic()
     start_epoch_ms = int(time.time() * 1000)
 
+    if args.report_file:
+        write_ctrf_report(args.report_file, build_ctrf_report(test_files, results, start_epoch_ms))
+
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = {executor.submit(execute_task, t, env, ui, stream_output, args.timeout, is_mock): t for t in test_files}
         pending = set(futures.keys())
@@ -542,6 +635,8 @@ def _run_with_cache(args, cache_dir, provider_url, token, ca_file):
                     r = f.result()
                     results.append(r)
                     if not r["success"]: failed_count_live += 1
+                    if args.report_file:
+                        write_ctrf_report(args.report_file, build_ctrf_report(test_files, results, start_epoch_ms))
 
             # Fail-Fast Trigger
             if args.fail_fast and failed_count_live >= args.fail_fast:
@@ -558,6 +653,10 @@ def _run_with_cache(args, cache_dir, provider_url, token, ca_file):
 
     # 5. Output Results
     results.sort(key=lambda x: x["testpath"])
+    stop_epoch_ms = int(time.time() * 1000)
+    if args.report_file:
+        write_ctrf_report(args.report_file, build_ctrf_report(
+            test_files, results, start_epoch_ms, stop_epoch_ms, complete=True))
 
     if args.log_dir:
         os.makedirs(args.log_dir, exist_ok=True)
@@ -591,63 +690,8 @@ def _run_with_cache(args, cache_dir, provider_url, token, ca_file):
         if args.verbose == 0 and (failed > 0 or warnings > 0):
             print(f"\n{Colors.YELLOW}Hint: Run with -v to see details of failed/warned checks{Colors.NC}")
     elif args.output == "ctrf":
-        stop_epoch_ms = int(time.time() * 1000)
-        executed_paths = {r["testpath"] for r in results}
-
-        def ctrf_status(r):
-            if r.get("skipped"):
-                return "skipped"
-            if r["success"]:
-                return "passed"
-            return "failed"
-
-        def ctrf_suite(testpath):
-            parts = testpath.split("/")
-            if len(parts) >= 2:
-                return parts[1].removesuffix(".d")
-            return ""
-
-        ctrf_tests = []
-        for r in results:
-            name = r["testpath"].removeprefix("checks.d/")
-            entry = {
-                "name": name,
-                "status": ctrf_status(r),
-                "duration": int(r["duration"] * 1000),
-                "suite": ctrf_suite(r["testpath"]),
-            }
-            if r["report_messages"]:
-                entry["message"] = "; ".join(r["report_messages"])
-            if not r["success"] and r["log"]:
-                entry["trace"] = "\n".join(r["log"])
-            ctrf_tests.append(entry)
-
-        for t in test_files:
-            if str(t) not in executed_paths:
-                ctrf_tests.append({
-                    "name": str(t).removeprefix("checks.d/"),
-                    "status": "skipped",
-                    "duration": 0,
-                    "suite": ctrf_suite(str(t)),
-                })
-
-        ctrf_report = {
-            "results": {
-                "tool": {"name": "virt-cluster-validate"},
-                "summary": {
-                    "tests": len(test_files),
-                    "passed": passed + warnings,
-                    "failed": failed + cancelled,
-                    "pending": 0,
-                    "skipped": skipped,
-                    "other": 0,
-                    "start": start_epoch_ms,
-                    "stop": stop_epoch_ms,
-                },
-                "tests": ctrf_tests,
-            }
-        }
-        print(json.dumps(ctrf_report, indent=2))
+        print(json.dumps(build_ctrf_report(
+            test_files, results, start_epoch_ms, stop_epoch_ms, complete=True), indent=2))
     elif args.output == "junit":
         print(build_junit_xml(results, test_files, skipped, failed + cancelled, verbose=args.verbose > 0))
 

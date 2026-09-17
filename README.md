@@ -44,6 +44,9 @@ Validates an OpenShift cluster's virtualization readiness.
     # CTRF output (For CI/CD integration)
     ./virt-cluster-validate -o ctrf
 
+    # Atomically update a CTRF report file as checks complete
+    ./virt-cluster-validate --report-file /tmp/virt-validation-report.json
+
     # Fail fast (Stop after 1 failure)
     ./virt-cluster-validate -f
 
@@ -58,6 +61,7 @@ Validates an OpenShift cluster's virtualization readiness.
 *   `--include PATTERNS`: Comma-separated substrings; only run tests whose path contains at least one pattern (e.g. `--include nodes,basic`).
 *   `--exclude PATTERNS`: Comma-separated substrings; skip tests whose path contains any pattern (e.g. `--exclude high-performance,rebalance`).
 *   `--log-dir DIR`: Write per-check log files to the given directory.
+*   `--report-file PATH`: Write complete, atomic CTRF snapshots to a file. The initial snapshot marks selected checks `pending`; snapshots are updated as checks finish.
 *   `-t, --timeout SPAN`: Max execution time per test (e.g. `2m`, `45s`, `180`. Default: `180`).
 *   `-c, --concurrency N`: Number of tests to run in parallel (Default: Number of CPU cores).
 *   `-f [N], --fail-fast [N]`: Stop execution after N failures (Default: 1).
