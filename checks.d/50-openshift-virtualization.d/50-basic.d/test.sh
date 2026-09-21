@@ -16,6 +16,7 @@
 #
 
 NS="${VIRT_VALIDATE_NAMESPACE:-}"
+DATA_SOURCE_NAMESPACE="openshift-virtualization-os-images"
 MANIFEST="$(mktemp)"
 VMNAME=""
 DVNAMES=""
@@ -31,7 +32,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
-virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee "$MANIFEST"
+DATA_SOURCE="${VIRT_VALIDATE_DATA_SOURCE:-}"
+if [ -z "$DATA_SOURCE" ]; then
+  for source in rhel10 rhel9; do
+    if oc get datasource -n "$DATA_SOURCE_NAMESPACE" "$source" >/dev/null 2>&1; then
+      DATA_SOURCE="$DATA_SOURCE_NAMESPACE/$source"
+      break
+    fi
+  done
+fi
+
+[ -n "$DATA_SOURCE" ] \
+  || fail_with Setup "Neither rhel10 nor rhel9 DataSource was found in ${DATA_SOURCE_NAMESPACE}"
+
+virtctl create vm "--volume-import=type:ds,src:${DATA_SOURCE}" | tee "$MANIFEST"
 oc create ${NS:+-n "$NS"} -f "$MANIFEST" \
   || fail_with Setup "Failed to create test VM"
 
