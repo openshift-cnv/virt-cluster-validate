@@ -121,6 +121,9 @@ The container image includes a must-gather entry point, allowing you to run the 
 *   `VIRT_VALIDATE_URL` / `VIRT_VALIDATE_TOKEN`: Remote cluster API URL and bearer token (same as `--url` / `--token`).
 *   `VIRT_VALIDATE_CA_FILE`: CA certificate file for verifying the remote API (same as `--ca-file`).
 *   `VIRT_VALIDATE_INSECURE_SKIP_TLS`: Set to `true` to skip TLS verification for the remote API.
+*   `VIRT_VALIDATE_NAMESPACE`: Namespace in which workload checks create their short-lived resources.
+*   `VIRT_VALIDATE_DATA_SOURCE`: Optional `namespace/name` override for the CDI DataSource used by the basic VM workload check. When unset, the check tries the `rhel10` and then `rhel9` aliases.
+*   `VM_READY_TIMEOUT`: Maximum time to wait for the validation VM to become ready (default: `2m`).
 
 ### Output
 
