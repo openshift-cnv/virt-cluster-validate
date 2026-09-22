@@ -29,6 +29,11 @@ if [ "$VSC_COUNT" -eq 0 ]; then
   fail_with VolumeSnapshotClass "No VolumeSnapshotClass found, snapshot operations will not work"
 fi
 
+VSC_DELETE_COUNT=$(oc get volumesnapshotclass -o json 2>/dev/null | jq '[.items[] | select(.deletionPolicy == "Delete")] | length' 2>/dev/null || echo 0)
+if [ "$VSC_DELETE_COUNT" -eq 0 ]; then
+  skip_with "All VolumeSnapshotClass objects have deletionPolicy=Retain (or unset). Skipping to avoid leaving retained backend snapshots behind."
+fi
+
 virtctl create vm --volume-import=type:ds,src:openshift-virtualization-os-images/rhel10 | tee vm.yaml
 oc create ${NS:+-n "$NS"} -f vm.yaml \
   || fail_with Setup "Failed to create test VM"
