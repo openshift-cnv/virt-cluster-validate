@@ -13,7 +13,7 @@ Validates an OpenShift cluster's virtualization readiness.
 ## Prerequisites
 
 *   `oc` and `virtctl` binaries in your `PATH`.
-*   Active `oc login` to the target cluster (required before execution).
+*   Cluster access via `oc login`, or `--url` plus `--token` (same as `kubectl mtv create provider --type openshift`).
 *   Python 3.x (to run the validator).
 *   [Claude Code](https://claude.ai/code) or [Gemini CLI](https://github.com/google/gemini-cli) (Optional, for AI-assisted development).
 
@@ -21,6 +21,10 @@ Validates an OpenShift cluster's virtualization readiness.
 
     # Login to the cluster
     oc login ...
+
+    # Or authenticate with API URL + bearer token (no prior oc login)
+    ./virt-cluster-validate --url https://api.cluster.example.com:6443 \
+      --token "$TOKEN" --insecure-skip-tls
 
     # Basic run (Human readable, summary only)
     ./virt-cluster-validate
@@ -57,6 +61,11 @@ Validates an OpenShift cluster's virtualization readiness.
 *   `-t, --timeout SPAN`: Max execution time per test (e.g. `2m`, `45s`, `180`. Default: `180`).
 *   `-c, --concurrency N`: Number of tests to run in parallel (Default: Number of CPU cores).
 *   `-f [N], --fail-fast [N]`: Stop execution after N failures (Default: 1).
+*   `--url URL`: OpenShift API server URL. Must be used with `--token`.
+*   `--token TOKEN`: Bearer token for `--url` (service account or user token).
+*   `--insecure-skip-tls`: Skip TLS verification when using `--url` (typical for self-signed API certs).
+
+`--url` and `--token` can also be set via `VIRT_VALIDATE_URL` and `VIRT_VALIDATE_TOKEN`. Set `VIRT_VALIDATE_INSECURE_SKIP_TLS=true` to skip TLS verification.
 
 ## Disconnected Environments (Container)
 
@@ -104,6 +113,8 @@ The container image includes a must-gather entry point, allowing you to run the 
 *   `SKIP_CHECKS`: Comma-separated substrings to skip certain checks (maps to `--exclude`).
 *   `TIMEOUT`: Per-check timeout (e.g. `5m`, `300`. Default: `180`).
 *   `CONCURRENCY`: Number of parallel checks (Default: CPU count).
+*   `VIRT_VALIDATE_URL` / `VIRT_VALIDATE_TOKEN`: Remote cluster API URL and bearer token (same as `--url` / `--token`).
+*   `VIRT_VALIDATE_INSECURE_SKIP_TLS`: Set to `true` to skip TLS verification for the remote API.
 
 ### Output
 
