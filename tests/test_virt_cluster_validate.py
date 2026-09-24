@@ -490,6 +490,67 @@ class TestVirtClusterValidate(unittest.TestCase):
         output = json.loads(res.stdout)
         self.assertEqual(output["results"]["summary"]["passed"], 1)
 
+    def test_ca_file_writes_kubeconfig_ca_data(self):
+        """Test that --ca-file embeds the CA certificate in the generated kubeconfig."""
+        self._create_prerequisite("#!/bin/bash\nexit 0")
+        ca_file = self.workspace / "ca.crt"
+        ca_file.write_text("test CA certificate\n")
+        self._create_test(
+            "10-kubeconfig.d",
+            "#!/bin/bash\n"
+            "python3 -c \"import base64,json,os; c=json.load(open(os.environ['KUBECONFIG'])); "
+            "assert base64.b64decode(c['clusters'][0]['cluster']['certificate-authority-data']) == b'test CA certificate\\\\n'; "
+            "assert 'insecure-skip-tls-verify' not in c['clusters'][0]['cluster']\"\n"
+        )
+
+        res = subprocess.run(
+            [
+                sys.executable, str(RUNNER_SCRIPT), "-o", "ctrf",
+                "--url", "https://api.cluster.example.com:6443",
+                "--token", "test-token", "--ca-file", str(ca_file),
+            ], cwd=self.workspace, capture_output=True, text=True,
+        )
+
+        self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
+        self.assertEqual(json.loads(res.stdout)["results"]["summary"]["passed"], 1)
+
+    def test_ca_file_and_insecure_skip_tls_error(self):
+        """A caller must select either a CA bundle or insecure TLS, not both."""
+        ca_file = self.workspace / "ca.crt"
+        ca_file.write_text("test CA certificate\n")
+
+        res = subprocess.run(
+            [
+                sys.executable, str(RUNNER_SCRIPT),
+                "--url", "https://api.cluster.example.com:6443",
+                "--token", "test-token", "--ca-file", str(ca_file),
+                "--insecure-skip-tls",
+            ], cwd=self.workspace, capture_output=True, text=True,
+        )
+
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("--ca-file and --insecure-skip-tls cannot be used together", res.stderr)
+
+    def test_ca_file_and_insecure_skip_tls_env_error(self):
+        """The equivalent environment variables are mutually exclusive too."""
+        ca_file = self.workspace / "ca.crt"
+        ca_file.write_text("test CA certificate\n")
+        run_env = os.environ.copy()
+        run_env.update({
+            "VIRT_VALIDATE_URL": "https://api.cluster.example.com:6443",
+            "VIRT_VALIDATE_TOKEN": "test-token",
+            "VIRT_VALIDATE_CA_FILE": str(ca_file),
+            "VIRT_VALIDATE_INSECURE_SKIP_TLS": "true",
+        })
+
+        res = subprocess.run(
+            [sys.executable, str(RUNNER_SCRIPT)],
+            cwd=self.workspace, env=run_env, capture_output=True, text=True,
+        )
+
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("--ca-file and --insecure-skip-tls cannot be used together", res.stderr)
+
     def test_url_without_token_errors(self):
         """Test that --url without --token is rejected."""
         self._create_test("10-pass.d", "#!/bin/bash\nexit 0")
