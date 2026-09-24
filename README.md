@@ -24,7 +24,7 @@ Validates an OpenShift cluster's virtualization readiness.
 
     # Or authenticate with API URL + bearer token (no prior oc login)
     ./virt-cluster-validate --url https://api.cluster.example.com:6443 \
-      --token "$TOKEN" --insecure-skip-tls
+      --token "$TOKEN" --ca-file /path/to/ca.crt
 
     # Basic run (Human readable, summary only)
     ./virt-cluster-validate
@@ -44,6 +44,9 @@ Validates an OpenShift cluster's virtualization readiness.
     # CTRF output (For CI/CD integration)
     ./virt-cluster-validate -o ctrf
 
+    # Atomically update a CTRF report file as checks complete
+    ./virt-cluster-validate --report-file /tmp/virt-validation-report.json
+
     # Fail fast (Stop after 1 failure)
     ./virt-cluster-validate -f
 
@@ -58,14 +61,16 @@ Validates an OpenShift cluster's virtualization readiness.
 *   `--include PATTERNS`: Comma-separated substrings; only run tests whose path contains at least one pattern (e.g. `--include nodes,basic`).
 *   `--exclude PATTERNS`: Comma-separated substrings; skip tests whose path contains any pattern (e.g. `--exclude high-performance,rebalance`).
 *   `--log-dir DIR`: Write per-check log files to the given directory.
+*   `--report-file PATH`: Write complete, atomic CTRF snapshots to a file. The initial snapshot marks selected checks `pending`; snapshots are updated as checks finish.
 *   `-t, --timeout SPAN`: Max execution time per test (e.g. `2m`, `45s`, `180`. Default: `180`).
 *   `-c, --concurrency N`: Number of tests to run in parallel (Default: Number of CPU cores).
 *   `-f [N], --fail-fast [N]`: Stop execution after N failures (Default: 1).
 *   `--url URL`: OpenShift API server URL. Must be used with `--token`.
 *   `--token TOKEN`: Bearer token for `--url` (service account or user token).
+*   `--ca-file PATH`: CA certificate file used to verify `--url` (use instead of `--insecure-skip-tls`).
 *   `--insecure-skip-tls`: Skip TLS verification when using `--url` (typical for self-signed API certs).
 
-`--url` and `--token` can also be set via `VIRT_VALIDATE_URL` and `VIRT_VALIDATE_TOKEN`. Set `VIRT_VALIDATE_INSECURE_SKIP_TLS=true` to skip TLS verification.
+`--url`, `--token`, and `--ca-file` can also be set via `VIRT_VALIDATE_URL`, `VIRT_VALIDATE_TOKEN`, and `VIRT_VALIDATE_CA_FILE`. Set `VIRT_VALIDATE_INSECURE_SKIP_TLS=true` to skip TLS verification.
 
 ## Disconnected Environments (Container)
 
@@ -114,7 +119,11 @@ The container image includes a must-gather entry point, allowing you to run the 
 *   `TIMEOUT`: Per-check timeout (e.g. `5m`, `300`. Default: `180`).
 *   `CONCURRENCY`: Number of parallel checks (Default: CPU count).
 *   `VIRT_VALIDATE_URL` / `VIRT_VALIDATE_TOKEN`: Remote cluster API URL and bearer token (same as `--url` / `--token`).
+*   `VIRT_VALIDATE_CA_FILE`: CA certificate file for verifying the remote API (same as `--ca-file`).
 *   `VIRT_VALIDATE_INSECURE_SKIP_TLS`: Set to `true` to skip TLS verification for the remote API.
+*   `VIRT_VALIDATE_NAMESPACE`: Namespace in which workload checks create their short-lived resources.
+*   `VIRT_VALIDATE_DATA_SOURCE`: Optional `namespace/name` override for the CDI DataSource used by the basic VM workload check. When unset, the check tries the `rhel10` and then `rhel9` aliases.
+*   `VM_READY_TIMEOUT`: Maximum time to wait for the validation VM to become ready (default: `2m`).
 
 ### Output
 
