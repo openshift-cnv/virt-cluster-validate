@@ -1,0 +1,26 @@
+apiVersion: validation.kubevirt.io/v1alpha1
+kind: VirtualizationValidation
+metadata:
+  name: target-canary-all-nodes-2
+  namespace: openshift-mtv
+spec:
+  run:
+    profile: basic-all-nodes-v1
+    suiteTimeoutSeconds: 1800
+    executionTimeoutSeconds: 300
+    maxConcurrentExecutions: 5
+  target:
+    credentialsSecret:
+      caKey: ca.crt
+      name: target-cluster-credentials
+      tokenKey: token
+    identity:
+      displayName: remote-target
+    url: https://api.z.fast.eng.rdu2.dc.redhat.com:6443
+  workload:
+    dataSource:
+      apiGroup: cdi.kubevirt.io
+      kind: DataSource
+      name: rhel10
+      namespace: openshift-virtualization-os-images
+    namespace: vcv-validation
