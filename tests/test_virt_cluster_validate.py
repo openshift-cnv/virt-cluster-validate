@@ -15,6 +15,7 @@
 import os
 import sys
 import json
+import re
 import runpy
 import time
 import unittest
@@ -25,6 +26,7 @@ from xml.etree import ElementTree as ET
 
 # Path to the script we are testing
 RUNNER_SCRIPT = Path(__file__).parent.parent / "virt-cluster-validate"
+CONTROLLER_SOURCE = Path(__file__).parent.parent / "internal/controller/virtualizationvalidation_controller.go"
 
 class TestVirtClusterValidate(unittest.TestCase):
     def setUp(self):
@@ -92,6 +94,44 @@ class TestVirtClusterValidate(unittest.TestCase):
         self.assertEqual(failed_test["status"], "failed")
         self.assertIn("trace", failed_test)
         self.assertTrue("I failed!" in failed_test["trace"])
+
+    def test_profiles_have_stable_check_ids(self):
+        runner = runpy.run_path(str(RUNNER_SCRIPT))
+        controller = CONTROLLER_SOURCE.read_text()
+        table = re.search(r"var stableCheckIDs = map\[string\]string\{(.*?)\n\}", controller, re.DOTALL)
+        self.assertIsNotNone(table, "stableCheckIDs table not found")
+        stable_ids = dict(re.findall(r'^\s*"([^"]+)":\s*"([^"]+)",$', table.group(1), re.MULTILINE))
+
+        for profile, checks in runner["PROFILES"].items():
+            for check in checks["cluster_checks"]:
+                test_id = runner["execution_task"](check, profile=profile)["test_id"]
+                self.assertIn(test_id, stable_ids, f"{profile} emits unmapped CTRF testId {test_id!r} from {check!r}")
+            for check in checks["node_checks"]:
+                test_id = runner["execution_task"](check, node_name="probe", profile=profile)["test_id"]
+                self.assertIn(test_id, stable_ids, f"{profile} emits unmapped CTRF testId {test_id!r} from {check!r}")
+
+    def test_publisher_advisory_ids_match_controller_severity(self):
+        previous = {key: os.environ.get(key) for key in ("VIRT_VALIDATE_RESULT_CONFIGMAP", "KUBERNETES_SERVICE_HOST")}
+        os.environ["VIRT_VALIDATE_RESULT_CONFIGMAP"] = "result"
+        os.environ["KUBERNETES_SERVICE_HOST"] = "kubernetes"
+        try:
+            publisher = runpy.run_path(str(RUNNER_SCRIPT.parent / "bin/publish-ctrf"))
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+        controller = CONTROLLER_SOURCE.read_text()
+        stable = re.search(r"var stableCheckIDs = map\[string\]string\{(.*?)\n\}", controller, re.DOTALL)
+        severities = re.search(r"var checkSeverities = map\[string\]validationv1alpha1.ValidationSeverity\{(.*?)\n\}", controller, re.DOTALL)
+        self.assertIsNotNone(stable)
+        self.assertIsNotNone(severities)
+        stable_ids = dict(re.findall(r'^\s*"([^"]+)":\s*"([^"]+)",$', stable.group(1), re.MULTILINE))
+        advisory_checks = set(re.findall(r'^\s*"([^"]+)":\s*validationv1alpha1.ValidationSeverityAdvisory,?$', severities.group(1), re.MULTILINE))
+        expected = {test_id for test_id, check_id in stable_ids.items() if check_id in advisory_checks}
+        self.assertEqual(publisher["ADVISORY_TEST_IDS"], expected)
 
     def test_report_reduction_uses_the_minimum_sufficient_rung(self):
         previous = {key: os.environ.get(key) for key in ("VIRT_VALIDATE_RESULT_CONFIGMAP", "KUBERNETES_SERVICE_HOST")}
