@@ -1,0 +1,65 @@
+#!/usr/bin/bash
+#
+# Copyright (C) 2026 Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# oc shim for omc-based integration testing.
+# Intercepts oc calls and delegates to omc for read-only operations,
+# returns canned responses for cluster-info/auth commands,
+# and rejects mutating operations.
+
+case "$1" in
+  whoami)
+    if [[ "$2" == "--show-server" ]]; then
+      echo "https://api.test-cluster.example.com:6443"
+    else
+      echo "test-admin"
+    fi
+    exit 0
+    ;;
+  auth)
+    echo "yes"
+    exit 0
+    ;;
+  cluster-info)
+    echo "Kubernetes control plane is running at https://api.test-cluster.example.com:6443"
+    exit 0
+    ;;
+  api-resources)
+    exit 1
+    ;;
+  get)
+    shift
+    # omc returns exit 0 with "No resources ..." when a resource is not found;
+    # real oc returns exit 1. Detect and correct.
+    output=$(omc get "$@" 2>&1)
+    rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "$output" >&2
+        exit $rc
+    fi
+    if [[ "$output" == "No resources"* ]]; then
+        echo "$output" >&2
+        exit 1
+    fi
+    echo "$output"
+    ;;
+  create|apply|delete|wait|exec|patch|run|adm)
+    echo "ERROR: '$1' not supported in omc test mode" >&2
+    exit 1
+    ;;
+  *)
+    exec omc "$@"
+    ;;
+esac
