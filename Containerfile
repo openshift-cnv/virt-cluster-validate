@@ -22,8 +22,9 @@ RUN microdnf update -y && \
     microdnf clean all && \
     ln -s /usr/bin/python3.11 /usr/bin/python3
 
-# Make /usr/local/bin writable so tools can be downloaded at runtime
-RUN chmod 777 /usr/local/bin
+# The validator Job overlays this directory with a writable emptyDir. Keep the
+# image PATH directory non-world-writable for standalone execution too.
+RUN chown 1001:0 /usr/local/bin
 
 USER 1001
 
