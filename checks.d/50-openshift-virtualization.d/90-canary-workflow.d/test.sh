@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+[ -n "${VIRT_VALIDATE_PROFILE:-}" ] \
+  || exec skip_with "Canary workflow is only selected by a validation profile"
+
 NS="${VIRT_VALIDATE_NAMESPACE:-}"
 DATA_SOURCE="${VIRT_VALIDATE_DATA_SOURCE:-}"
 VM_OPERATION_TIMEOUT="${VM_READY_TIMEOUT:-2m}"

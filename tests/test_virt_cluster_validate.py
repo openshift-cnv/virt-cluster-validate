@@ -307,6 +307,25 @@ class TestVirtClusterValidate(unittest.TestCase):
         self.assertEqual(test["testId"], "basic-v1/canary-workflow")
         self.assertEqual([step["name"] for step in test["steps"]], ["Start VM", "Snapshot", "Live migrate VM"])
 
+    def test_canary_workflow_skips_without_a_validation_profile(self):
+        """The legacy must-gather run must not create a canary VM."""
+        script = RUNNER_SCRIPT.parent / "checks.d/50-openshift-virtualization.d/90-canary-workflow.d/test.sh"
+        env = os.environ.copy()
+        env.pop("VIRT_VALIDATE_PROFILE", None)
+        env.pop("TEST_REPORT_FD", None)
+        env["PATH"] = f"{RUNNER_SCRIPT.parent / 'bin'}:{env['PATH']}"
+
+        res = subprocess.run(
+            ["bash", str(script)],
+            cwd=self.workspace,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(res.returncode, 77, res.stderr)
+        self.assertIn("SKIP: Canary workflow is only selected by a validation profile", res.stdout)
+
     def test_basic_profile_publishes_queued_workflow_steps(self):
         self._create_test(
             "50-openshift-virtualization.d/90-canary-workflow.d",
