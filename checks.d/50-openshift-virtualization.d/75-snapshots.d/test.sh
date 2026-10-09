@@ -67,6 +67,21 @@ fi
 [ -n "$DATA_SOURCE" ] || fail_with Setup "Neither rhel10 nor rhel9 DataSource was found in ${DATA_SOURCE_NAMESPACE}"
 virtctl create vm "--volume-import=type:ds,src:${DATA_SOURCE}" > vm.yaml \
   || fail_with Setup "Failed to generate the snapshot VM manifest"
+oc create --dry-run=client -o json -f vm.yaml | \
+  jq --arg namespace "$NS" --arg validation_uid "${VIRT_VALIDATE_VALIDATION_UID:-}" --arg run_id "${VIRT_VALIDATE_RUN_ID:-}" '
+    if $namespace != "" then .metadata.namespace = $namespace else . end |
+    .metadata.labels["app.kubernetes.io/managed-by"] = "virt-cluster-validate" |
+    if $validation_uid != "" then .metadata.labels["validation.kubevirt.io/uid"] = $validation_uid else . end |
+    if $run_id != "" then .metadata.labels["validation.kubevirt.io/run"] = $run_id else . end |
+    (.spec.template.metadata.labels["app.kubernetes.io/managed-by"] = "virt-cluster-validate") |
+    if $validation_uid != "" then (.spec.template.metadata.labels["validation.kubevirt.io/uid"] = $validation_uid) else . end |
+    if $run_id != "" then (.spec.template.metadata.labels["validation.kubevirt.io/run"] = $run_id) else . end |
+    (.spec.dataVolumeTemplates[]?.metadata.labels["app.kubernetes.io/managed-by"] = "virt-cluster-validate") |
+    if $validation_uid != "" then (.spec.dataVolumeTemplates[]?.metadata.labels["validation.kubevirt.io/uid"] = $validation_uid) else . end |
+    if $run_id != "" then (.spec.dataVolumeTemplates[]?.metadata.labels["validation.kubevirt.io/run"] = $run_id) else . end
+  ' > vm.json \
+  || fail_with Setup "Failed to prepare the snapshot VM manifest"
+mv vm.json vm.yaml
 oc create ${NS:+-n "$NS"} -f vm.yaml \
   || fail_with Setup "Failed to create test VM"
 
@@ -83,6 +98,10 @@ apiVersion: snapshot.kubevirt.io/v1alpha1
 kind: VirtualMachineSnapshot
 metadata:
   name: ${SNAPSHOT_NAME}
+  labels:
+    app.kubernetes.io/managed-by: virt-cluster-validate
+    validation.kubevirt.io/uid: "${VIRT_VALIDATE_VALIDATION_UID:-}"
+    validation.kubevirt.io/run: "${VIRT_VALIDATE_RUN_ID:-}"
 spec:
   source:
     apiGroup: kubevirt.io
@@ -104,6 +123,10 @@ apiVersion: snapshot.kubevirt.io/v1alpha1
 kind: VirtualMachineRestore
 metadata:
   name: ${RESTORE_NAME}
+  labels:
+    app.kubernetes.io/managed-by: virt-cluster-validate
+    validation.kubevirt.io/uid: "${VIRT_VALIDATE_VALIDATION_UID:-}"
+    validation.kubevirt.io/run: "${VIRT_VALIDATE_RUN_ID:-}"
 spec:
   target:
     apiGroup: kubevirt.io
