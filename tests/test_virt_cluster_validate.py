@@ -326,6 +326,42 @@ class TestVirtClusterValidate(unittest.TestCase):
         self.assertEqual(res.returncode, 77, res.stderr)
         self.assertIn("SKIP: Canary workflow is only selected by a validation profile", res.stdout)
 
+    def test_must_gather_profile_is_forwarded_to_the_runner(self):
+        base_dir = self.workspace / "validator"
+        (base_dir / "bin").mkdir(parents=True)
+        (base_dir / "bin" / "download-tools.sh").write_text("#!/bin/bash\nexit 0\n")
+        (base_dir / "bin" / "download-tools.sh").chmod(0o755)
+        runner_args = self.workspace / "runner-args"
+        (base_dir / "virt-cluster-validate").write_text(
+            "#!/bin/bash\n"
+            "printf '%s\\n' \"$@\" > \"$RUNNER_ARGS_FILE\"\n"
+            "printf '%s\\n' '{\"results\": {\"summary\": {\"passed\": 0, \"failed\": 0, \"skipped\": 0, \"tests\": 0}, \"tests\": []}}'\n"
+        )
+        (base_dir / "virt-cluster-validate").chmod(0o755)
+        output_dir = self.workspace / "must-gather"
+        env = os.environ.copy()
+        env.update({
+            "POD_NAME": "must-gather-profile",
+            "MUST_GATHER": str(output_dir),
+            "RUNNER_ARGS_FILE": str(runner_args),
+            "VIRT_VALIDATE_BASE_DIR": str(base_dir),
+        })
+
+        res = subprocess.run(
+            ["bash", str(RUNNER_SCRIPT.parent / "collection-scripts/gather"), "--profile", "basic-v1"],
+            cwd=self.workspace,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(runner_args.read_text().splitlines(), [
+            "-o", "ctrf", "--log-dir", str(output_dir / "virt-cluster-validate/logs"),
+            "--junit-file", str(output_dir / "virt-cluster-validate/junit-results.xml"),
+            "--profile", "basic-v1",
+        ])
+
     def test_basic_profile_publishes_queued_workflow_steps(self):
         self._create_test(
             "50-openshift-virtualization.d/90-canary-workflow.d",
