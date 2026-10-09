@@ -18,13 +18,14 @@
 #
 # Usage:
 #   oc adm must-gather --image=<image> -- /usr/bin/gather
+#   oc adm must-gather --image=<image> -- /usr/bin/gather --profile basic-v1
 #   oc adm must-gather --image=<image> -- CHECKS=nodes,basic /usr/bin/gather
 #   oc adm must-gather --image=<image> -- SKIP_CHECKS=rebalance,bare-metal TIMEOUT=5m /usr/bin/gather
 #
 
 set -euo pipefail
 
-BASE_DIR="/opt/app-root/src"
+BASE_DIR="${VIRT_VALIDATE_BASE_DIR:-/opt/app-root/src}"
 
 # Download oc and virtctl from cluster
 "${BASE_DIR}/bin/download-tools.sh"
@@ -39,6 +40,37 @@ if [[ "${POD_NAME:-}" != *"must-gather"* ]]; then
     exec "${BASE_DIR}/virt-cluster-validate" -v
 fi
 
+profile=""
+while (($#)); do
+    case "$1" in
+        --profile)
+            if (($# < 2)); then
+                echo "virt-cluster-validate: --profile requires a profile name" >&2
+                exit 2
+            fi
+            profile="$2"
+            shift 2
+            ;;
+        --profile=*)
+            profile="${1#--profile=}"
+            shift
+            ;;
+        --help|-h)
+            cat <<'EOF'
+Usage: /usr/bin/gather [--profile PROFILE]
+
+Options:
+  --profile PROFILE  Run an explicit validation profile instead of the default check set.
+EOF
+            exit 0
+            ;;
+        *)
+            echo "virt-cluster-validate: unknown gather argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+
 OUTPUT_DIR="${MUST_GATHER:-/must-gather}/virt-cluster-validate"
 
 # Export the must-gather namespace so check scripts create resources there.
@@ -52,6 +84,10 @@ fi
 mkdir -p "${OUTPUT_DIR}/logs"
 
 RUNNER_ARGS=("-o" "ctrf" "--log-dir" "${OUTPUT_DIR}/logs" "--junit-file" "${OUTPUT_DIR}/junit-results.xml")
+
+if [[ -n "${profile}" ]]; then
+    RUNNER_ARGS+=("--profile" "${profile}")
+fi
 
 if [[ -n "${CHECKS:-}" ]]; then
     RUNNER_ARGS+=("--include" "${CHECKS}")
