@@ -18,7 +18,9 @@ set -euo pipefail
 
 report_file="${VIRT_VALIDATE_REPORT_FILE:-/tmp/virt-validation/ctrf.json}"
 mkdir -p "$(dirname "$report_file")"
-/opt/app-root/src/bin/download-tools.sh
+# oc is baked into the validator image from a pinned, trusted source. Never
+# download executable tools from the target cluster under validation.
+source /opt/app-root/src/bin/configure-target
 publish-ctrf &
 publisher_pid=$!
 runner_pid=""

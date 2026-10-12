@@ -83,10 +83,9 @@ if [ -z "$DATA_SOURCE" ]; then
 fi
 [ -n "$DATA_SOURCE" ] || fail_step "Start VM" Setup "No DataSource was configured or discovered"
 
-virtctl create vm "--volume-import=type:ds,src:${DATA_SOURCE}" > "$MANIFEST" \
+create-vm-manifest --data-source "$DATA_SOURCE" > "$MANIFEST" \
   || fail_step "Start VM" Setup "Failed to generate the canary VM manifest"
-oc create --dry-run=client -o json -f "$MANIFEST" | \
-  jq --arg namespace "$NS" --arg hostname "${VIRT_VALIDATE_NODE_HOSTNAME:-}" --arg validation_uid "${VIRT_VALIDATE_VALIDATION_UID:-}" '
+jq --arg namespace "$NS" --arg hostname "${VIRT_VALIDATE_NODE_HOSTNAME:-}" --arg validation_uid "${VIRT_VALIDATE_VALIDATION_UID:-}" '
     if $namespace != "" then .metadata.namespace = $namespace else . end |
     if $validation_uid != "" then .metadata.labels["validation.kubevirt.io/validation-uid"] = $validation_uid else . end |
     if $hostname != "" then .spec.template.spec.nodeSelector["kubernetes.io/hostname"] = $hostname else . end

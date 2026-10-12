@@ -92,24 +92,6 @@ type CredentialSecretReference struct {
 	CAKey string `json:"caKey,omitempty"`
 }
 
-// ValidationToolDownloads configures optional target-specific CLI download
-// endpoints. Explicit URLs avoid assuming an api.<domain> API hostname or
-// enabled console and virtctl download Routes.
-type ValidationToolDownloads struct {
-	// ClusterDomain is the target ingress domain used only when an explicit
-	// download URL is not supplied.
-	// +kubebuilder:validation:MaxLength=253
-	ClusterDomain string `json:"clusterDomain,omitempty"`
-	// OCURL is the HTTPS archive URL for the target-compatible oc client.
-	// +kubebuilder:validation:MaxLength=2048
-	// +kubebuilder:validation:Pattern=`^https://`
-	OCURL string `json:"ocURL,omitempty"`
-	// VirtctlURL is the HTTPS archive URL for target-compatible virtctl.
-	// +kubebuilder:validation:MaxLength=2048
-	// +kubebuilder:validation:Pattern=`^https://`
-	VirtctlURL string `json:"virtctlURL,omitempty"`
-}
-
 // ValidationTarget describes the remote Kubernetes API being validated.
 type ValidationTarget struct {
 	// +kubebuilder:validation:MinLength=1
@@ -124,8 +106,6 @@ type ValidationTarget struct {
 	InsecureSkipTLS bool `json:"insecureSkipTLS,omitempty"`
 	// Identity is descriptive metadata for users and consumers.
 	Identity TargetIdentity `json:"identity,omitempty"`
-	// ToolDownloads optionally overrides target CLI discovery.
-	ToolDownloads *ValidationToolDownloads `json:"toolDownloads,omitempty"`
 }
 
 // WorkloadDataSourceReference is a namespaced CDI DataSource used to create a

@@ -329,8 +329,6 @@ class TestVirtClusterValidate(unittest.TestCase):
     def test_must_gather_profile_is_forwarded_to_the_runner(self):
         base_dir = self.workspace / "validator"
         (base_dir / "bin").mkdir(parents=True)
-        (base_dir / "bin" / "download-tools.sh").write_text("#!/bin/bash\nexit 0\n")
-        (base_dir / "bin" / "download-tools.sh").chmod(0o755)
         runner_args = self.workspace / "runner-args"
         (base_dir / "virt-cluster-validate").write_text(
             "#!/bin/bash\n"
@@ -361,6 +359,25 @@ class TestVirtClusterValidate(unittest.TestCase):
             "--junit-file", str(output_dir / "virt-cluster-validate/junit-results.xml"),
             "--profile", "basic-v1",
         ])
+
+    def test_create_vm_manifest_uses_the_datasource_without_virtctl(self):
+        manifest = RUNNER_SCRIPT.parent / "bin" / "create-vm-manifest"
+        res = subprocess.run(
+            [str(manifest), "--data-source", "openshift-virtualization-os-images/rhel10"],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(res.returncode, 0, res.stderr)
+        vm = json.loads(res.stdout)
+        volume = vm["spec"]["dataVolumeTemplates"][0]
+        self.assertEqual(vm["kind"], "VirtualMachine")
+        self.assertEqual(volume["spec"]["sourceRef"], {
+            "kind": "DataSource",
+            "namespace": "openshift-virtualization-os-images",
+            "name": "rhel10",
+        })
+        self.assertEqual(vm["spec"]["instancetype"]["inferFromVolume"], volume["metadata"]["name"])
 
     def test_basic_profile_publishes_queued_workflow_steps(self):
         self._create_test(

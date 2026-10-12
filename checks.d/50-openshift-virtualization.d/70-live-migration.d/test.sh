@@ -70,10 +70,9 @@ fi
 oc auth can-i create virtualmachineinstancemigrations.kubevirt.io ${NS:+-n "$NS"} | grep -qx yes \
   || fail_migration Permissions "No permission to perform live migration"
 
-virtctl create vm "--volume-import=type:ds,src:${DATA_SOURCE}" > vm.yaml \
+create-vm-manifest --data-source "$DATA_SOURCE" > vm.yaml \
   || fail_migration Setup "Failed to generate the migration VM manifest"
-oc create --dry-run=client -o json -f vm.yaml | \
-  jq --arg namespace "$NS" 'if $namespace != "" then .metadata.namespace = $namespace else . end' > vm.json \
+jq --arg namespace "$NS" 'if $namespace != "" then .metadata.namespace = $namespace else . end' vm.yaml > vm.json \
   || fail_migration Setup "Failed to prepare the migration VM manifest"
 mv vm.json vm.yaml
 oc create ${NS:+-n "$NS"} -f vm.yaml \

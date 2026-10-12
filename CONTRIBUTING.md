@@ -62,7 +62,7 @@ If your check creates resources (VMs, pods, migrations, snapshots), add a cleanu
     }
     trap cleanup EXIT
 
-    virtctl create vm ... | tee vm.yaml
+    create-vm-manifest --data-source openshift-virtualization-os-images/rhel10 > vm.yaml
     oc create -f vm.yaml
     # ... test logic ...
     # cleanup runs automatically on exit, pass or fail

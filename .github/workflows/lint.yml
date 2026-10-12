@@ -105,7 +105,7 @@ jobs:
         run: |
           shellcheck -s bash -S warning -e SC1091 \
             bin/fail_with bin/pass_with bin/skip_with bin/step bin/summarize_results bin/oc_cached \
-            bin/entrypoint.sh bin/download-tools.sh \
+            bin/configure-target bin/create-vm-manifest bin/entrypoint.sh bin/run-validation \
             collection-scripts/gather
 
   license-headers:

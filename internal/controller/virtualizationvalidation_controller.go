@@ -315,16 +315,6 @@ func (r *VirtualizationValidationReconciler) job(validation *validationv1alpha1.
 		corev1.EnvVar{Name: "VIRT_VALIDATE_EXECUTION_TIMEOUT_SECONDS", Value: strconv.FormatInt(effectiveExecutionTimeout(validation.Spec.Run.ExecutionTimeoutSeconds), 10)},
 		corev1.EnvVar{Name: "VIRT_VALIDATE_CLEANUP_POLICY", Value: effectiveCleanupPolicy(validation.Spec.Run.CleanupPolicy)},
 	)
-	tools := toolDownloads(validation)
-	if tools.ClusterDomain != "" {
-		env = append(env, corev1.EnvVar{Name: "VIRT_VALIDATE_CLUSTER_DOMAIN", Value: tools.ClusterDomain})
-	}
-	if tools.OCURL != "" {
-		env = append(env, corev1.EnvVar{Name: "VIRT_VALIDATE_OC_URL", Value: tools.OCURL})
-	}
-	if tools.VirtctlURL != "" {
-		env = append(env, corev1.EnvVar{Name: "VIRT_VALIDATE_VIRTCTL_URL", Value: tools.VirtctlURL})
-	}
 	if validation.Spec.Run.MaxConcurrentExecutions > 0 {
 		env = append(env, corev1.EnvVar{Name: "VIRT_VALIDATE_CONCURRENCY", Value: strconv.FormatInt(int64(validation.Spec.Run.MaxConcurrentExecutions), 10)})
 	}
@@ -337,8 +327,8 @@ func (r *VirtualizationValidationReconciler) job(validation *validationv1alpha1.
 	readOnlyRootFilesystem := true
 	allowPrivilegeEscalation := false
 	runAsNonRoot := true
-	mounts := []corev1.VolumeMount{{Name: "tools", MountPath: "/usr/local/bin"}, {Name: "tmp", MountPath: "/tmp"}}
-	volumes := []corev1.Volume{{Name: "tools", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}, {Name: "tmp", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}
+	mounts := []corev1.VolumeMount{{Name: "tmp", MountPath: "/tmp"}}
+	volumes := []corev1.Volume{{Name: "tmp", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}
 	if !validation.Spec.Target.InsecureSkipTLS && caKeyFor(validation) != "" {
 		mounts = append(mounts, corev1.VolumeMount{Name: "credentials", MountPath: "/var/run/virt-validation", ReadOnly: true})
 		volumes = append(volumes, corev1.Volume{Name: "credentials", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: validation.Spec.Target.CredentialsSecret.Name, Items: []corev1.KeyToPath{{Key: caKeyFor(validation), Path: "ca.crt"}}}}})
@@ -695,8 +685,7 @@ func trustedProfile(profile string, workload validationv1alpha1.ValidationWorklo
 }
 
 func inputHash(validation *validationv1alpha1.VirtualizationValidation, profile string) string {
-	tools := toolDownloads(validation)
-	input := strings.Join([]string{validation.Spec.Run.ID, normalizedTargetURL(validation.Spec.Target.URL), validation.Spec.Target.CredentialsSecret.Name, tokenKeyFor(validation), caKeyFor(validation), fmt.Sprint(validation.Spec.Target.InsecureSkipTLS), tools.ClusterDomain, tools.OCURL, tools.VirtctlURL, validation.Spec.Workload.Namespace, dataSourceAPIGroup(validation.Spec.Workload.DataSource), dataSourceKind(validation.Spec.Workload.DataSource), dataSourceName(validation.Spec.Workload.DataSource), validation.Spec.Run.Profile, profile, fmt.Sprint(effectiveSuiteTimeout(validation.Spec.Run.SuiteTimeoutSeconds)), fmt.Sprint(effectiveExecutionTimeout(validation.Spec.Run.ExecutionTimeoutSeconds)), effectiveCleanupPolicy(validation.Spec.Run.CleanupPolicy), fmt.Sprint(validation.Spec.Run.MaxConcurrentExecutions), fmt.Sprint(effectiveQueueTimeout(validation.Spec.Run.QueueTimeoutSeconds, validation.Spec.Run.SuiteTimeoutSeconds))}, "\x00")
+	input := strings.Join([]string{validation.Spec.Run.ID, normalizedTargetURL(validation.Spec.Target.URL), validation.Spec.Target.CredentialsSecret.Name, tokenKeyFor(validation), caKeyFor(validation), fmt.Sprint(validation.Spec.Target.InsecureSkipTLS), validation.Spec.Workload.Namespace, dataSourceAPIGroup(validation.Spec.Workload.DataSource), dataSourceKind(validation.Spec.Workload.DataSource), dataSourceName(validation.Spec.Workload.DataSource), validation.Spec.Run.Profile, profile, fmt.Sprint(effectiveSuiteTimeout(validation.Spec.Run.SuiteTimeoutSeconds)), fmt.Sprint(effectiveExecutionTimeout(validation.Spec.Run.ExecutionTimeoutSeconds)), effectiveCleanupPolicy(validation.Spec.Run.CleanupPolicy), fmt.Sprint(validation.Spec.Run.MaxConcurrentExecutions), fmt.Sprint(effectiveQueueTimeout(validation.Spec.Run.QueueTimeoutSeconds, validation.Spec.Run.SuiteTimeoutSeconds))}, "\x00")
 	sum := sha256.Sum256([]byte(input))
 	return fmt.Sprintf("%x", sum[:])
 }
@@ -1303,15 +1292,6 @@ func validSpec(validation *validationv1alpha1.VirtualizationValidation) error {
 	if validation.Spec.Target.CredentialsSecret.Name == "" {
 		return fmt.Errorf("target.credentialsSecret is required")
 	}
-	tools := toolDownloads(validation)
-	for name, value := range map[string]string{"target.toolDownloads.ocURL": tools.OCURL, "target.toolDownloads.virtctlURL": tools.VirtctlURL} {
-		if value != "" {
-			endpoint, err := url.ParseRequestURI(value)
-			if err != nil || endpoint.Scheme != "https" || endpoint.Host == "" {
-				return fmt.Errorf("%s must be an absolute HTTPS URL", name)
-			}
-		}
-	}
 	target, err := url.ParseRequestURI(validation.Spec.Target.URL)
 	if err != nil || target.Scheme != "https" || target.Host == "" || target.User != nil || target.RawQuery != "" || target.Fragment != "" {
 		return fmt.Errorf("target.url must be an absolute HTTPS URL without user information, query, or fragment")
@@ -1363,13 +1343,6 @@ func targetURLPort(rawURL string) (int, error) {
 		return 0, fmt.Errorf("must be between 1 and 65535")
 	}
 	return number, nil
-}
-
-func toolDownloads(validation *validationv1alpha1.VirtualizationValidation) validationv1alpha1.ValidationToolDownloads {
-	if validation.Spec.Target.ToolDownloads == nil {
-		return validationv1alpha1.ValidationToolDownloads{}
-	}
-	return *validation.Spec.Target.ToolDownloads
 }
 
 func effectiveSuiteTimeout(timeout int64) int64 {

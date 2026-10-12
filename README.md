@@ -12,7 +12,7 @@ Validates an OpenShift cluster's virtualization readiness.
 
 ## Prerequisites
 
-*   `oc` and `virtctl` binaries in your `PATH`.
+*   `oc` in your `PATH`.
 *   Cluster access via `oc login`, or `--url` plus `--token` (same as `kubectl mtv create provider --type openshift`).
 *   Python 3.x (to run the validator).
 *   [Claude Code](https://claude.ai/code) or [Gemini CLI](https://github.com/google/gemini-cli) (Optional, for AI-assisted development).
@@ -85,7 +85,7 @@ If you are running in a restricted environment or don't have Python/`oc` install
     podman push myregistry.internal/virt-cluster-validate:latest
     ```
 3.  **Run as a Job:**
-    You can deploy this as a Kubernetes `Job` within your cluster. The container already includes the `oc` and `virtctl` binaries.
+    You can deploy this as a Kubernetes `Job` within your cluster. The container includes a pinned `oc` binary.
 
 4.  **Run locally with Podman:**
     To test the container locally, mount your `KUBECONFIG`:
@@ -125,13 +125,9 @@ The container image includes a must-gather entry point, allowing you to run the 
 *   `VIRT_VALIDATE_URL` / `VIRT_VALIDATE_TOKEN`: Remote cluster API URL and bearer token (same as `--url` / `--token`).
 *   `VIRT_VALIDATE_CA_FILE`: CA certificate file for verifying the remote API (same as `--ca-file`); it cannot be combined with `VIRT_VALIDATE_INSECURE_SKIP_TLS`.
 *   `VIRT_VALIDATE_INSECURE_SKIP_TLS`: Set to `true` to skip TLS verification for the remote API; it cannot be combined with `VIRT_VALIDATE_CA_FILE`.
-*   `VIRT_VALIDATE_CLUSTER_DOMAIN`: Optional target ingress domain used only for conventional OpenShift tool-download Routes.
-*   `VIRT_VALIDATE_OC_URL`: Optional HTTPS archive URL for a target-compatible `oc` client.
-*   `VIRT_VALIDATE_VIRTCTL_URL`: Optional HTTPS archive URL for target-compatible `virtctl`. When explicit URLs are omitted, controller mode uses conventional console and `hyperconverged-cluster-cli-download-openshift-cnv` Routes without granting the target token cluster-wide Route discovery access.
 *   `VIRT_VALIDATE_NAMESPACE`: Namespace in which workload checks create their short-lived resources.
 *   `VIRT_VALIDATE_DATA_SOURCE`: Optional `namespace/name` override for the CDI DataSource used by the basic VM workload check. When unset, the check tries the `rhel10` and then `rhel9` aliases.
 *   `VM_READY_TIMEOUT`: Maximum time to wait for the validation VM to become ready (default: `2m`). Controller mode derives it from `spec.run.executionTimeoutSeconds`.
-*   `VIRT_VALIDATE_TOOL_DOWNLOAD_TIMEOUT_SECONDS`: Maximum duration of each `oc` or `virtctl` download (default: `300`).
 
 ### Output
 
@@ -317,23 +313,17 @@ validation CR still accepts only an HTTPS target URL; clusters that require
 tighter egress control must permit the target endpoint (or proxy) through their
 own egress firewall or policy implementation.
 
-The validation namespace must be able to reach the target API endpoint on port
-6443 and its HTTPS tool-download route. If an egress firewall or proxy is in
-use, allow the validator Job's egress accordingly. `HTTP_PROXY`,
+The validation namespace must be able to reach the target API endpoint on its
+declared port. If an egress firewall or proxy is in use, allow the validator
+Job's egress accordingly. `HTTP_PROXY`,
 `HTTPS_PROXY`, and `NO_PROXY` set on the controller Deployment are propagated
 to its validator Jobs.
 
-For this PoC, controller Jobs use the same tool bootstrap as the existing
-must-gather image. The controller mounts a writable tools-only `emptyDir` at
-`/usr/local/bin`; the root filesystem remains read-only. The `basic-v1`
-profile verifies target authentication, CNV installation, the validation
-namespace quota, then starts, snapshots, and live-migrates one canary VM. It
-uses both `oc` and `virtctl`.
-Tool downloads are dynamically discovered and temporarily skip TLS
-verification; this is a tracked PoC limitation before promotion to production.
-For clusters with a custom API hostname or disabled tool-download Routes, set
-`spec.target.toolDownloads.ocURL` and `virtctlURL`; alternatively set
-`clusterDomain` when only the API hostname is non-conventional.
+The validator image contains a pinned OpenShift CLI obtained during its image
+build from a trusted source. It never downloads or executes tools served by
+the target cluster. The `basic-v1` profile verifies target authentication,
+CNV installation, the validation namespace quota, then starts, snapshots, and
+live-migrates one canary VM using Kubernetes and KubeVirt APIs through `oc`.
 
 `basic-all-nodes-v1` performs the same platform checks and starts, snapshots,
 then live-migrates one canary VM on every target worker node that is Ready and
@@ -390,10 +380,6 @@ spec:
     identity:
       id: development-cluster
       displayName: Development cluster
-    # Required only when conventional target download Routes cannot be used.
-    # toolDownloads:
-    #   ocURL: https://tools.example.invalid/oc.rhel9.tar
-    #   virtctlURL: https://tools.example.invalid/virtctl.tar.gz
   workload:
     namespace: ${validation_namespace}
     dataSource:
