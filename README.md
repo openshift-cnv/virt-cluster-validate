@@ -103,6 +103,9 @@ The container image includes a must-gather entry point, allowing you to run the 
     # Run all checks
     oc adm must-gather --image=<image> -- /usr/bin/gather
 
+    # Run an explicit controller-compatible validation profile
+    oc adm must-gather --image=<image> -- /usr/bin/gather --profile basic-v1
+
     # Run only specific checks (substring match on test paths)
     oc adm must-gather --image=<image> -- CHECKS=nodes,basic /usr/bin/gather
 
@@ -118,6 +121,7 @@ The container image includes a must-gather entry point, allowing you to run the 
 *   `SKIP_CHECKS`: Comma-separated substrings to skip certain checks (maps to `--exclude`).
 *   `TIMEOUT`: Per-check timeout (e.g. `5m`, `300`. Default: `180`).
 *   `CONCURRENCY`: Number of parallel checks (Default: CPU count).
+*   `--profile`: Optional must-gather argument that selects a named validation profile (for example, `basic-v1`). Without it, must-gather retains the default full check set.
 *   `VIRT_VALIDATE_URL` / `VIRT_VALIDATE_TOKEN`: Remote cluster API URL and bearer token (same as `--url` / `--token`).
 *   `VIRT_VALIDATE_CA_FILE`: CA certificate file for verifying the remote API (same as `--ca-file`); it cannot be combined with `VIRT_VALIDATE_INSECURE_SKIP_TLS`.
 *   `VIRT_VALIDATE_INSECURE_SKIP_TLS`: Set to `true` to skip TLS verification for the remote API; it cannot be combined with `VIRT_VALIDATE_CA_FILE`.
