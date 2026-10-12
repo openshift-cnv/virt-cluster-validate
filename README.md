@@ -218,6 +218,18 @@ podman build -t quay.io/example/virt-validation-controller:dev \
   -f build/validation-controller/Containerfile .
 ```
 
+The upstream repository publishes both images to `quay.io/openshift-cnv` on
+pushes to protected branches and on `v*` tags. Every publication includes an
+immutable `sha-<full-commit>` tag, and the workflow summary records the
+corresponding image digest. Use that digest when deploying the controller or
+configuring a consumer such as MTV. The mutable `:dev` tag follows `main` and
+is only intended for development and smoke testing.
+
+Publishing requires a Quay robot account with write access to both
+repositories. Configure its credentials as the upstream repository's
+`QUAY_USERNAME` and `QUAY_PASSWORD` GitHub Actions secrets; pull requests do
+not receive those secrets and never publish images.
+
 Local controller checks are available through Make:
 
 ```bash
