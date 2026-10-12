@@ -585,6 +585,25 @@ func TestReconcileRequeuesAfterInitializingRunState(t *testing.T) {
 	}
 }
 
+func TestReconcileAddsFinalizerWithMetadataPatch(t *testing.T) {
+	scheme := controllerScheme(t)
+	validation := validation("target", "one")
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(validation).WithObjects(validation).Build()
+	reconciler := &VirtualizationValidationReconciler{Client: fakeClient, Scheme: scheme}
+
+	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(validation)}); err != nil {
+		t.Fatal(err)
+	}
+
+	updated := &validationv1alpha1.VirtualizationValidation{}
+	if err := fakeClient.Get(context.Background(), client.ObjectKeyFromObject(validation), updated); err != nil {
+		t.Fatal(err)
+	}
+	if !contains(updated.Finalizers, finalizer) {
+		t.Fatalf("validation finalizer was not added: %#v", updated.Finalizers)
+	}
+}
+
 func TestCancelDeletesJobAndMarksValidationCancelled(t *testing.T) {
 	scheme := controllerScheme(t)
 	validation := validation("target", "one")

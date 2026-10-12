@@ -93,6 +93,42 @@ func TestVirtualizationValidationCRD(t *testing.T) {
 	if systemTrust.Spec.Target.CredentialsSecret.CAKey != "" {
 		t.Fatalf("explicit empty caKey must preserve system trust, got %q", systemTrust.Spec.Target.CredentialsSecret.CAKey)
 	}
+	withoutIdentity := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "validation.kubevirt.io/v1alpha1",
+		"kind":       "VirtualizationValidation",
+		"metadata": map[string]interface{}{
+			"name":      "target-without-identity",
+			"namespace": sampleNamespace,
+		},
+		"spec": map[string]interface{}{
+			"target": map[string]interface{}{
+				"url": "https://api.target.example.com:6443",
+				"credentialsSecret": map[string]interface{}{
+					"name": "target-cluster-credentials",
+				},
+			},
+			"workload": map[string]interface{}{
+				"namespace": "mtv-validation",
+				"dataSource": map[string]interface{}{
+					"namespace": "openshift-virtualization-os-images",
+					"name":      "rhel10",
+				},
+			},
+			"run": map[string]interface{}{"profile": "basic-v1"},
+		},
+	}}
+	if err := apiClient.Create(ctx, withoutIdentity); err != nil {
+		t.Fatalf("creating request without target identity: %v", err)
+	}
+	metadataOnly := &validationv1alpha1.VirtualizationValidation{}
+	if err := apiClient.Get(ctx, client.ObjectKeyFromObject(withoutIdentity), metadataOnly); err != nil {
+		t.Fatal(err)
+	}
+	original := metadataOnly.DeepCopy()
+	metadataOnly.Finalizers = append(metadataOnly.Finalizers, finalizer)
+	if err := apiClient.Patch(ctx, metadataOnly, client.MergeFrom(original)); err != nil {
+		t.Fatalf("adding a finalizer without mutating an omitted optional spec field: %v", err)
+	}
 	defaults := validation.DeepCopy()
 	defaults.Name = "target-defaults"
 	defaults.ResourceVersion = ""

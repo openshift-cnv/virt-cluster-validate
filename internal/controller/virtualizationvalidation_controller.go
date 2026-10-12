@@ -165,8 +165,13 @@ func (r *VirtualizationValidationReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{}, r.finalize(ctx, validation)
 	}
 	if !contains(validation.Finalizers, finalizer) {
+		original := validation.DeepCopy()
 		validation.Finalizers = append(validation.Finalizers, finalizer)
-		return ctrl.Result{}, r.Update(ctx, validation)
+		// Do not use Update here. Optional fields omitted by the caller can be
+		// re-serialized by the typed client while adding this finalizer, making
+		// the API server see an unintended spec mutation. The CRD intentionally
+		// makes spec immutable, so patch only the metadata change.
+		return ctrl.Result{}, r.Patch(ctx, validation, client.MergeFrom(original))
 	}
 	if validation.Spec.Run.Cancel {
 		return ctrl.Result{}, r.cancel(ctx, validation)
@@ -836,8 +841,9 @@ func (r *VirtualizationValidationReconciler) finalize(ctx context.Context, valid
 	if err := r.deleteLeaseIfUnused(ctx, validation); err != nil {
 		return err
 	}
+	original := validation.DeepCopy()
 	validation.Finalizers = remove(validation.Finalizers, finalizer)
-	return r.Update(ctx, validation)
+	return r.Patch(ctx, validation, client.MergeFrom(original))
 }
 
 func (r *VirtualizationValidationReconciler) deleteLeaseIfUnused(ctx context.Context, validation *validationv1alpha1.VirtualizationValidation) error {
