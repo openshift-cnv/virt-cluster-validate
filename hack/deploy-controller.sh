@@ -17,6 +17,8 @@
 set -euo pipefail
 
 namespace="${NAMESPACE:-openshift-mtv}"
+leader_election_id="${LEADER_ELECTION_ID:-virt-validation-controller.validation.kubevirt.io}"
+leader_election_timeout_seconds="${LEADER_ELECTION_TIMEOUT_SECONDS:-90}"
 : "${CONTROLLER_IMAGE:?set CONTROLLER_IMAGE to a pullable controller image}"
 : "${VALIDATOR_IMAGE:?set VALIDATOR_IMAGE to a pullable validator image}"
 
@@ -42,3 +44,20 @@ patch="$(jq -cn --arg controller "$CONTROLLER_IMAGE" --arg validator "$VALIDATOR
   }]}}}}')"
 oc -n "$namespace" patch deployment virt-validation-controller --type=strategic -p "$patch"
 oc -n "$namespace" rollout status deployment/virt-validation-controller --timeout="${ROLLOUT_TIMEOUT:-5m}"
+
+leader_deadline=$((SECONDS + leader_election_timeout_seconds))
+while (( SECONDS < leader_deadline )); do
+  holder_identity="$(oc -n "$namespace" get lease "$leader_election_id" -o jsonpath='{.spec.holderIdentity}' 2>/dev/null || true)"
+  if [[ -n "$holder_identity" ]]; then
+    echo "Validation controller leader elected: $holder_identity"
+    exit 0
+  fi
+  sleep 2
+done
+
+echo "Validation controller did not acquire leader lease $leader_election_id within ${leader_election_timeout_seconds}s" >&2
+oc -n "$namespace" get deployment,pods -l app.kubernetes.io/name=virt-validation-controller -o wide || true
+oc -n "$namespace" get lease "$leader_election_id" -o yaml || true
+oc -n "$namespace" logs deployment/virt-validation-controller --all-containers=true --tail=-1 || true
+oc -n "$namespace" get events --sort-by=.lastTimestamp || true
+exit 1
