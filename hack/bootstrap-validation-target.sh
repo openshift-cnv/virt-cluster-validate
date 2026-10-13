@@ -41,6 +41,9 @@ rules:
 - apiGroups: [""]
   resources: ["pods", "persistentvolumeclaims"]
   verbs: ["create", "delete", "get", "list", "patch", "watch"]
+- apiGroups: [""]
+  resources: ["resourcequotas"]
+  verbs: ["get", "list"]
 - apiGroups: ["cdi.kubevirt.io"]
   resources: ["datavolumes"]
   verbs: ["create", "delete", "get", "list", "patch", "watch"]
@@ -97,6 +100,10 @@ rules:
 - apiGroups: [""]
   resources: ["nodes"]
   verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  resourceNames: ["openshift-cnv"]
+  verbs: ["get"]
 - apiGroups: ["snapshot.storage.k8s.io"]
   resources: ["volumesnapshotclasses"]
   verbs: ["get", "list"]
@@ -113,4 +120,33 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: virt-validation-target-reader
+EOF
+
+# The installation check verifies the named KubeVirt deployment after checking
+# the CNV namespace. Keep that access constrained to the platform namespace.
+"${target_oc[@]}" apply -f - <<EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: virt-validation-kubevirt-reader
+  namespace: openshift-cnv
+rules:
+- apiGroups: ["kubevirt.io"]
+  resources: ["kubevirts"]
+  resourceNames: ["kubevirt-kubevirt-hyperconverged"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: virt-validation-kubevirt-reader
+  namespace: openshift-cnv
+subjects:
+- kind: ServiceAccount
+  name: ${service_account}
+  namespace: ${target_namespace}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: virt-validation-kubevirt-reader
 EOF
