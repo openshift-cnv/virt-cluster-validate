@@ -523,6 +523,33 @@ roleRef:
 ---
 EOF
 
+cat <<EOF | KUBECONFIG="${target_kubeconfig}" oc apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: target-validator-kubevirt-reader
+  namespace: openshift-cnv
+rules:
+  - apiGroups: [kubevirt.io]
+    resources: [kubevirts]
+    resourceNames: [kubevirt-kubevirt-hyperconverged]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: target-validator-kubevirt-reader
+  namespace: openshift-cnv
+subjects:
+  - kind: ServiceAccount
+    name: target-validator
+    namespace: ${target_workload_namespace}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: target-validator-kubevirt-reader
+EOF
+
 # Permit the canary to read the golden-image DataSource.
 cat <<EOF | KUBECONFIG="${target_kubeconfig}" oc apply -f -
 apiVersion: rbac.authorization.k8s.io/v1
