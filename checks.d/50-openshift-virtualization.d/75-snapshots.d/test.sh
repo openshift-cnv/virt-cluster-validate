@@ -65,7 +65,7 @@ if [ -z "$DATA_SOURCE" ]; then
   done
 fi
 [ -n "$DATA_SOURCE" ] || fail_with Setup "Neither rhel10 nor rhel9 DataSource was found in ${DATA_SOURCE_NAMESPACE}"
-virtctl create vm "--volume-import=type:ds,src:${DATA_SOURCE}" > vm.yaml \
+create-vm-manifest --data-source "$DATA_SOURCE" > vm.yaml \
   || fail_with Setup "Failed to generate the snapshot VM manifest"
 oc create ${NS:+-n "$NS"} -f vm.yaml \
   || fail_with Setup "Failed to create test VM"
@@ -75,8 +75,10 @@ SNAPSHOT_NAME="snap-${VMNAME}"
 
 oc wait ${NS:+-n "$NS"} --for=condition=Ready=true --timeout="$VM_OPERATION_TIMEOUT" -f vm.yaml \
   || fail_with Setup "VM did not become Ready"
-virtctl stop ${NS:+-n "$NS"} "$VMNAME" \
+oc patch ${NS:+-n "$NS"} vm "$VMNAME" --type=merge -p '{"spec":{"runStrategy":"Halted"}}' \
   || fail_with Setup "Failed to stop VM"
+oc wait ${NS:+-n "$NS"} --for=delete "vmi/${VMNAME}" --timeout="$VM_OPERATION_TIMEOUT" \
+  || fail_with Setup "VM did not stop"
 
 tee snap.yaml <<EOF
 apiVersion: snapshot.kubevirt.io/v1alpha1

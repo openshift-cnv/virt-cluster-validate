@@ -49,7 +49,7 @@ if [ -z "$DATA_SOURCE" ]; then
   done
 fi
 [ -n "$DATA_SOURCE" ] || fail_with Setup "Neither rhel10 nor rhel9 DataSource was found in ${DATA_SOURCE_NAMESPACE}"
-virtctl create vm --instancetype cx1.medium "--volume-import=type:ds,src:${DATA_SOURCE}" > vm.yaml \
+create-vm-manifest --data-source "$DATA_SOURCE" --instancetype cx1.medium > vm.yaml \
   || fail_with Setup "Failed to generate the high-performance VM manifest"
 oc create ${NS:+-n "$NS"} -f vm.yaml \
   || fail_with Setup "Failed to create high-performance test VM"

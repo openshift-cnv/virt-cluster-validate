@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Copyright (C) 2026 Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -euo pipefail
+
+if [[ -z "${VIRT_VALIDATE_URL:-}" || -z "${VIRT_VALIDATE_TOKEN:-}" ]]; then
+    return 0
+fi
+
+target_kubeconfig="${VIRT_VALIDATE_TOOL_KUBECONFIG:-/tmp/virt-validation/tools-kubeconfig}"
+mkdir -p "$(dirname "$target_kubeconfig")"
+if [[ "${VIRT_VALIDATE_INSECURE_SKIP_TLS:-}" == "true" ]]; then
+    oc config --kubeconfig="$target_kubeconfig" set-cluster target --server="$VIRT_VALIDATE_URL" --insecure-skip-tls-verify=true
+else
+    if [[ -z "${VIRT_VALIDATE_CA_FILE:-}" ]]; then
+        echo "ERROR: VIRT_VALIDATE_CA_FILE is required for a TLS-verified target connection." >&2
+        return 1
+    fi
+    oc config --kubeconfig="$target_kubeconfig" set-cluster target --server="$VIRT_VALIDATE_URL" --certificate-authority="$VIRT_VALIDATE_CA_FILE" --embed-certs=true
+fi
+oc config --kubeconfig="$target_kubeconfig" set-credentials target-validator --token="$VIRT_VALIDATE_TOKEN"
+oc config --kubeconfig="$target_kubeconfig" set-context target-validator --cluster=target --user=target-validator
+oc config --kubeconfig="$target_kubeconfig" use-context target-validator
+export KUBECONFIG="$target_kubeconfig"

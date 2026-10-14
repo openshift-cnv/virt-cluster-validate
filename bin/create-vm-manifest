@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+#
+# Copyright (C) 2026 Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -euo pipefail
+
+data_source=""
+instancetype=""
+
+while (($#)); do
+    case "$1" in
+        --data-source)
+            data_source="${2:?--data-source requires namespace/name}"
+            shift 2
+            ;;
+        --instancetype)
+            instancetype="${2:?--instancetype requires a name}"
+            shift 2
+            ;;
+        *)
+            echo "usage: create-vm-manifest --data-source namespace/name [--instancetype name]" >&2
+            exit 2
+            ;;
+    esac
+done
+
+data_source_namespace="${data_source%/*}"
+data_source_name="${data_source##*/}"
+if [[ -z "$data_source" || "$data_source_namespace" == "$data_source" || -z "$data_source_name" ]]; then
+    echo "--data-source must be namespace/name" >&2
+    exit 2
+fi
+
+suffix="$(od -An -N4 -tx4 /dev/urandom | tr -d '[:space:]')"
+vm_name="vm-${suffix}"
+volume_name="imported-volume-${suffix}"
+
+jq -n \
+    --arg vm_name "$vm_name" \
+    --arg volume_name "$volume_name" \
+    --arg data_source_namespace "$data_source_namespace" \
+    --arg data_source_name "$data_source_name" \
+    --arg instancetype "$instancetype" '
+    {
+      apiVersion: "kubevirt.io/v1",
+      kind: "VirtualMachine",
+      metadata: {name: $vm_name},
+      spec: {
+        dataVolumeTemplates: [{
+          metadata: {name: $volume_name},
+          spec: {
+            sourceRef: {
+              kind: "DataSource",
+              name: $data_source_name,
+              namespace: $data_source_namespace
+            },
+            storage: {resources: {}}
+          }
+        }],
+        runStrategy: "Always",
+        template: {
+          spec: {
+            domain: {
+              devices: {},
+              memory: {guest: "512Mi"},
+              resources: {}
+            },
+            terminationGracePeriodSeconds: 180,
+            volumes: [{name: $volume_name, dataVolume: {name: $volume_name}}]
+          }
+        }
+      }
+    }
+    | if $instancetype == "" then
+        .spec.instancetype = {inferFromVolume: $volume_name, inferFromVolumeFailurePolicy: "Ignore"}
+        | .spec.preference = {inferFromVolume: $volume_name, inferFromVolumeFailurePolicy: "Ignore"}
+      else
+        .spec.instancetype = {kind: "virtualmachineclusterinstancetype", name: $instancetype}
+      end'

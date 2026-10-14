@@ -60,10 +60,9 @@ fi
 [ -n "$DATA_SOURCE" ] \
   || fail_with Setup "Neither rhel10 nor rhel9 DataSource was found in ${DATA_SOURCE_NAMESPACE}"
 
-virtctl create vm "--volume-import=type:ds,src:${DATA_SOURCE}" > "$MANIFEST" \
+create-vm-manifest --data-source "$DATA_SOURCE" > "$MANIFEST" \
   || fail_with Setup "Failed to generate the test VM manifest"
-oc create --dry-run=client -o json -f "$MANIFEST" | \
-  jq --arg namespace "$NS" --arg hostname "${VIRT_VALIDATE_NODE_HOSTNAME:-}" '
+jq --arg namespace "$NS" --arg hostname "${VIRT_VALIDATE_NODE_HOSTNAME:-}" '
     if $namespace != "" then .metadata.namespace = $namespace else . end |
     if $hostname != "" then .spec.template.spec.nodeSelector["kubernetes.io/hostname"] = $hostname else . end
   ' > "${MANIFEST}.json" \

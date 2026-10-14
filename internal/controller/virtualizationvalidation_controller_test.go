@@ -427,12 +427,25 @@ func TestJobUsesProfileAndCredentialKeys(t *testing.T) {
 	if key := environmentSecretKey(container.Env, "VIRT_VALIDATE_TOKEN"); key != "access-token" {
 		t.Fatalf("unexpected token key: %q", key)
 	}
-	if job.Spec.Template.Spec.Volumes[2].Secret.Items[0].Key != "target-ca" {
+	credentialsVolume := volumeNamed(job.Spec.Template.Spec.Volumes, "credentials")
+	if credentialsVolume == nil || credentialsVolume.Secret == nil || credentialsVolume.Secret.Items[0].Key != "target-ca" {
 		t.Fatal("custom CA key was not mounted")
+	}
+	if volumeNamed(job.Spec.Template.Spec.Volumes, "tools") != nil {
+		t.Fatal("validator Job must not mount a writable tools directory")
 	}
 	if !reflect.DeepEqual(job.Labels, job.Spec.Template.Labels) {
 		t.Fatalf("validator Pod labels do not match Job labels: job=%#v pod=%#v", job.Labels, job.Spec.Template.Labels)
 	}
+}
+
+func volumeNamed(volumes []corev1.Volume, name string) *corev1.Volume {
+	for index := range volumes {
+		if volumes[index].Name == name {
+			return &volumes[index]
+		}
+	}
+	return nil
 }
 
 func TestJobDoesNotMountCAWhenTLSIsInsecure(t *testing.T) {

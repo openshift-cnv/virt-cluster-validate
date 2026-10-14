@@ -12,19 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+# Keep the client in the image build supply chain.  Do not obtain executable
+# code from the OpenShift cluster being validated at runtime.
+FROM registry.ci.openshift.org/ocp/4.20:cli@sha256:4d5808453b2204f083da166045328bd72af280be1fa82af0cd48cd87aa87b70e AS openshift-cli
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6
 
 USER 0
 
 # Install Python 3.11 and required tools
-RUN microdnf update -y && \
-    microdnf install -y python3.11 jq tar gzip rsync which util-linux-core && \
+RUN microdnf install -y python3.11 jq tar gzip rsync which util-linux-core && \
     microdnf clean all && \
     ln -s /usr/bin/python3.11 /usr/bin/python3
 
-# The validator Job overlays this directory with a writable emptyDir. Keep the
-# image PATH directory non-world-writable for standalone execution too.
-RUN chown 1001:0 /usr/local/bin
+COPY --from=openshift-cli /usr/bin/oc /usr/bin/oc
 
 USER 1001
 
