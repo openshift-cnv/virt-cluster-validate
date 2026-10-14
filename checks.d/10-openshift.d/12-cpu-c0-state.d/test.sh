@@ -49,6 +49,9 @@ metadata:
   name: ${POD_NAME}
   labels:
     app: virt-cluster-validate-c0-check
+    app.kubernetes.io/managed-by: virt-cluster-validate
+    validation.kubevirt.io/uid: "${VIRT_VALIDATE_VALIDATION_UID:-}"
+    validation.kubevirt.io/run: "${VIRT_VALIDATE_RUN_ID:-}"
 spec:
   nodeName: ${NODE_NAME}
   restartPolicy: Never

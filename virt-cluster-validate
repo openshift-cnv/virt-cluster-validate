@@ -332,6 +332,53 @@ def run_test(test_file, env, stream_output=False, timeout_secs=180, progress_cal
         "steps": steps,
     }
 
+
+VALIDATION_UID_LABEL = "validation.kubevirt.io/uid"
+VALIDATION_RUN_LABEL = "validation.kubevirt.io/run"
+
+
+def cleanup_leftover_resources(env):
+    """Best-effort cleanup for resources from this controller validation only.
+
+    Check-local EXIT traps remain responsible for their named resources.  This
+    sweep is deliberately restricted to the VirtualizationValidation UID so
+    concurrent node checks, other validation runs, and standalone must-gather
+    execution can never delete one another's resources.
+    """
+    validation_uid = env.get("VIRT_VALIDATE_VALIDATION_UID")
+    run_id = env.get("VIRT_VALIDATE_RUN_ID")
+    namespace = env.get("VIRT_VALIDATE_NAMESPACE")
+    if not validation_uid or not run_id or not namespace or env.get("VIRT_VALIDATE_CLEANUP_POLICY", "Always") != "Always":
+        return []
+
+    selector = f"{VALIDATION_UID_LABEL}={validation_uid},{VALIDATION_RUN_LABEL}={run_id}"
+    resource_types = "pods,vm,vmi,vmim,vmsnapshot,vmrestore,dv,pvc"
+    namespace_args = ["-n", namespace]
+    try:
+        result = subprocess.run(
+            ["oc", "get", resource_types, "-l", selector,
+             "-o", "jsonpath={range .items[*]}{.kind}/{.metadata.name} {end}"] + namespace_args,
+            capture_output=True, text=True, timeout=30, env=env,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+
+    if result.returncode != 0:
+        return []
+    leftovers = result.stdout.split()
+    if not leftovers:
+        return []
+
+    try:
+        subprocess.run(
+            ["oc", "delete", resource_types, "-l", selector,
+             "--ignore-not-found=true", "--force", "--grace-period=0", "--wait=false"] + namespace_args,
+            capture_output=True, text=True, timeout=30, env=env,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return leftovers
+
 def execution_task(test_file, node_name=None, hostname=None, failure=None, profile=None):
     testpath = str(test_file)
     is_canary_workflow = testpath == "checks.d/50-openshift-virtualization.d/90-canary-workflow.d/test.sh"
@@ -707,7 +754,7 @@ def ctrf_test_entry(task, result=None, complete=False):
     return entry
 
 
-def build_ctrf_report(tasks, results, start_epoch_ms, stop_epoch_ms=None, complete=False):
+def build_ctrf_report(tasks, results, start_epoch_ms, stop_epoch_ms=None, complete=False, leftovers=None):
     """Build a complete, schema-valid CTRF snapshot for the selected checks."""
     results_by_execution = {r["execution_id"]: r for r in results}
     tests = [ctrf_test_entry(task, results_by_execution.get(task["execution_id"]), complete) for task in tasks]
@@ -725,7 +772,7 @@ def build_ctrf_report(tasks, results, start_epoch_ms, stop_epoch_ms=None, comple
     # CTRF requires a timestamped summary even for an in-progress snapshot. Until
     # the run completes, stop denotes the instant this snapshot was generated.
     summary["stop"] = stop_epoch_ms or int(time.time() * 1000)
-    return {
+    report = {
         "reportFormat": "CTRF",
         "specVersion": "0.0.0",
         "results": {
@@ -734,6 +781,11 @@ def build_ctrf_report(tasks, results, start_epoch_ms, stop_epoch_ms=None, comple
             "tests": tests,
         },
     }
+    if leftovers:
+        report["results"]["extra"] = {
+            "validation.kubevirt.io/cleanedLeftoverResources": leftovers,
+        }
+    return report
 
 
 def write_ctrf_report(path, report):
@@ -936,12 +988,21 @@ def _run_with_cache(args, cache_dir, provider_url, token, ca_file, insecure_skip
     for task in (task for task in tasks if task["execution_id"] not in executed_ids):
         ui.update_test(task["display"], f"[{Colors.YELLOW}SKIP{Colors.NC}]")
 
-    # 5. Output Results
+    # 5. Final, validation-scoped safety cleanup.  This intentionally does
+    # not run for debug-retention policies or standalone execution.
+    leftovers = []
+    if not is_mock:
+        leftovers = cleanup_leftover_resources(env)
+        if leftovers:
+            print(f"WARNING: cleaned {len(leftovers)} validation-scoped leftover resource(s): "
+                  f"{', '.join(leftovers)}", file=sys.stderr)
+
+    # 6. Output Results
     results.sort(key=lambda x: x["execution_id"])
     stop_epoch_ms = int(time.time() * 1000)
     if args.report_file:
         write_ctrf_report(args.report_file, build_ctrf_report(
-            tasks, results, start_epoch_ms, stop_epoch_ms, complete=True))
+            tasks, results, start_epoch_ms, stop_epoch_ms, complete=True, leftovers=leftovers))
 
     if args.log_dir:
         os.makedirs(args.log_dir, exist_ok=True)
@@ -976,7 +1037,7 @@ def _run_with_cache(args, cache_dir, provider_url, token, ca_file, insecure_skip
             print(f"\n{Colors.YELLOW}Hint: Run with -v to see details of failed/warned checks{Colors.NC}")
     elif args.output == "ctrf":
         print(json.dumps(build_ctrf_report(
-            tasks, results, start_epoch_ms, stop_epoch_ms, complete=True), indent=2))
+            tasks, results, start_epoch_ms, stop_epoch_ms, complete=True, leftovers=leftovers), indent=2))
     elif args.output == "junit":
         print(build_junit_xml(results, tasks, skipped, failed + cancelled, verbose=args.verbose > 0))
 

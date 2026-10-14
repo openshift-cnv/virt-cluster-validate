@@ -21,6 +21,7 @@ import time
 import unittest
 import subprocess
 import tempfile
+from unittest import mock
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -94,6 +95,41 @@ class TestVirtClusterValidate(unittest.TestCase):
         self.assertEqual(failed_test["status"], "failed")
         self.assertIn("trace", failed_test)
         self.assertTrue("I failed!" in failed_test["trace"])
+
+    def test_leftover_cleanup_is_scoped_to_controller_validation(self):
+        runner = runpy.run_path(str(RUNNER_SCRIPT))
+        completed = [
+            subprocess.CompletedProcess([], 0, "VirtualMachine/example ", ""),
+            subprocess.CompletedProcess([], 0, "", ""),
+        ]
+        with mock.patch.object(runner["subprocess"], "run", side_effect=completed) as run:
+            leftovers = runner["cleanup_leftover_resources"]({
+                "VIRT_VALIDATE_NAMESPACE": "vcv-validation",
+                "VIRT_VALIDATE_VALIDATION_UID": "validation-uid",
+                "VIRT_VALIDATE_RUN_ID": "run-id",
+                "VIRT_VALIDATE_CLEANUP_POLICY": "Always",
+            })
+
+        self.assertEqual(leftovers, ["VirtualMachine/example"])
+        self.assertEqual(run.call_count, 2)
+        for call in run.call_args_list:
+            self.assertIn("validation.kubevirt.io/uid=validation-uid,validation.kubevirt.io/run=run-id", call.args[0])
+            self.assertIn("-n", call.args[0])
+            self.assertIn("vcv-validation", call.args[0])
+
+    def test_leftover_cleanup_skips_standalone_and_debug_retention_runs(self):
+        runner = runpy.run_path(str(RUNNER_SCRIPT))
+        with mock.patch.object(runner["subprocess"], "run") as run:
+            self.assertEqual(runner["cleanup_leftover_resources"]({
+                "VIRT_VALIDATE_NAMESPACE": "vcv-validation",
+            }), [])
+            self.assertEqual(runner["cleanup_leftover_resources"]({
+                "VIRT_VALIDATE_NAMESPACE": "vcv-validation",
+                "VIRT_VALIDATE_VALIDATION_UID": "validation-uid",
+                "VIRT_VALIDATE_RUN_ID": "run-id",
+                "VIRT_VALIDATE_CLEANUP_POLICY": "Never",
+            }), [])
+        run.assert_not_called()
 
     def test_profiles_have_stable_check_ids(self):
         runner = runpy.run_path(str(RUNNER_SCRIPT))
