@@ -143,6 +143,19 @@ func TestAggregateVerdict(t *testing.T) {
 	}
 }
 
+func TestRunningVerdictPreservesCompleteReportVerdict(t *testing.T) {
+	complete := validationv1alpha1.VirtualizationValidationStatus{
+		ReportComplete: true,
+		Verdict:        validationv1alpha1.ValidationVerdictValid,
+	}
+	if verdict := runningVerdict(complete); verdict != validationv1alpha1.ValidationVerdictValid {
+		t.Fatalf("running verdict after final report = %q, want Valid", verdict)
+	}
+	if verdict := runningVerdict(validationv1alpha1.VirtualizationValidationStatus{Verdict: validationv1alpha1.ValidationVerdictValid}); verdict != validationv1alpha1.ValidationVerdictUnknown {
+		t.Fatalf("running verdict before final report = %q, want Unknown", verdict)
+	}
+}
+
 func TestStableCheckIDsMatchRunnerOutput(t *testing.T) {
 	runnerTestIDs := map[string]string{
 		"checks.d/10-openshift.d/00-login.d/test.sh":                       "openshift/login",

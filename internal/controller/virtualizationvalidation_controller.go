@@ -294,7 +294,18 @@ func (r *VirtualizationValidationReconciler) Reconcile(ctx context.Context, req 
 		}
 		return ctrl.Result{}, r.setStatus(ctx, validation, validationv1alpha1.ValidationPhaseCompleted, validation.Status.Verdict, "ChecksCompleted", "validator job completed with unsuccessful checks")
 	}
-	return ctrl.Result{RequeueAfter: leaseRenewAfter}, r.setStatus(ctx, validation, validationv1alpha1.ValidationPhaseRunning, validationv1alpha1.ValidationVerdictUnknown, "JobRunning", "validator job is running")
+	return ctrl.Result{RequeueAfter: leaseRenewAfter}, r.setStatus(ctx, validation, validationv1alpha1.ValidationPhaseRunning, runningVerdict(validation.Status), "JobRunning", "validator job is running")
+}
+
+// runningVerdict preserves the result of a complete CTRF report while the Job
+// cache catches up with the Job's terminal status. Without this, a delayed Job
+// update can overwrite a final verdict with Unknown immediately before the
+// terminal reconciliation completes the validation.
+func runningVerdict(status validationv1alpha1.VirtualizationValidationStatus) validationv1alpha1.ValidationVerdict {
+	if status.ReportComplete {
+		return status.Verdict
+	}
+	return validationv1alpha1.ValidationVerdictUnknown
 }
 
 func (r *VirtualizationValidationReconciler) job(validation *validationv1alpha1.VirtualizationValidation, name, resultName, profile string) *batchv1.Job {
